@@ -57,6 +57,10 @@ class LetterCatalog(Protocol):
 
 @runtime_checkable
 class TokenVerifier(Protocol):
-    """Decides whether a connection may practise."""
+    """Decides who, if anyone, is behind a connection."""
 
-    def verify(self, token: str) -> bool: ...
+    def user_id(self, token: str) -> int | None:
+        """The user the token names, or None if it names nobody.
+
+        Returning the id rather than a yes/no is what lets attempts be
+        attributed without the transport layer decoding tokens itself."""

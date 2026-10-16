@@ -315,8 +315,17 @@ Rules:
   it in `docs/alphabet.md`, keep dynamic letters out of the MVP.
 
 ### 8.2 Landmark extraction (`ml/bukva/extract_landmarks.py`)
-- MediaPipe Tasks `HandLandmarker`, VIDEO mode, the **same `.task` file**
-  as the frontend.
+- MediaPipe Tasks `HandLandmarker`, **IMAGE mode**, the **same `.task` file**
+  as the frontend. (Was VIDEO mode. VIDEO mode demands monotonically
+  increasing timestamps, which clips restarting at zero break, and it carries
+  tracking state across clip boundaries; a detector per clip exhausted TFLite's
+  allocator under parallelism. The frames we keep are sampled seconds apart, so
+  they are independent estimates either way, and IMAGE mode runs inference only
+  on the sampled frames.)
+- Store **raw** landmarks plus each video's `width`/`height`. Normalization
+  needs the aspect ratio (6.2, step 4), and keeping the raw output means a
+  `FEATURE_VERSION` bump costs a retrain rather than another pass over 27 GB.
+- Apply the same handedness rule as the browser (7): store the physical hand.
 - Use only frames inside the annotated sign interval. If no interval is
   annotated, take the central part of the clip and document the heuristic.
 - Sample up to K evenly spaced frames per video (configurable, default 8),

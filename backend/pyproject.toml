@@ -6,7 +6,7 @@ requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
-    "pydantic>=2.8",
+    "pydantic[email]>=2.8",
     "pydantic-settings>=2.4",
     "numpy>=2.0",
     "sqlalchemy[asyncio]>=2.0",
@@ -53,6 +53,12 @@ select = ["E", "F", "I", "B", "UP"]
 [tool.mypy]
 strict = true
 plugins = ["pydantic.mypy"]
+
+# MediaPipe ships no type information, so its surface is untyped by necessity.
+# Everything we build on top of it stays strictly typed.
+[[tool.mypy.overrides]]
+module = ["mediapipe.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

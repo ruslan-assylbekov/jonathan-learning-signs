@@ -11,6 +11,7 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from starlette.testclient import WebSocketTestSession
 
 from app.config import settings
@@ -25,9 +26,11 @@ FULLY_BENT = dict.fromkeys(("thumb", "index", "middle", "ring", "pinky"), (80.0,
 
 
 @pytest.fixture
-def client(monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
+def client(
+    monkeypatch: pytest.MonkeyPatch, pooled_sessions: async_sessionmaker[AsyncSession]
+) -> Iterator[TestClient]:
     monkeypatch.setattr(settings, "dev_auth", True)
-    with TestClient(build_app()) as test_client:
+    with TestClient(build_app(pooled_sessions)) as test_client:
         yield test_client
 
 
@@ -82,10 +85,15 @@ def test_a_good_token_is_acknowledged_silently(socket: WebSocketTestSession) -> 
     assert socket.receive_json()["type"] == "eval", "auth should not emit a message of its own"
 
 
-def test_the_socket_is_closed_when_dev_auth_is_off(client: TestClient) -> None:
-    """Default configuration must not leave practice open to anyone (M3)."""
-    settings.dev_auth = False
-    with TestClient(build_app()) as closed:
+def test_an_unsigned_token_is_refused_without_dev_auth(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    pooled_sessions: async_sessionmaker[AsyncSession],
+) -> None:
+    """With DEV_AUTH off, only a token this server signed gets in."""
+    monkeypatch.setattr(settings, "dev_auth", False)
+    monkeypatch.setattr(settings, "jwt_secret", "a-real-secret-for-this-test")
+    with TestClient(build_app(pooled_sessions)) as closed:
         with closed.websocket_connect("/ws/practice") as session:
             session.send_json({"type": "auth", "token": "anything"})
 
@@ -233,11 +241,15 @@ def test_the_wrong_target_never_succeeds(socket: WebSocketTestSession) -> None:
 
 
 def test_frames_over_the_budget_are_dropped(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch
+    monkeypatch: pytest.MonkeyPatch, pooled_sessions: async_sessionmaker[AsyncSession]
 ) -> None:
+    monkeypatch.setattr(settings, "dev_auth", True)
     monkeypatch.setattr(settings, "max_fps_per_conn", 2)
 
-    with TestClient(build_app()).websocket_connect("/ws/practice") as session:
+    with (
+        TestClient(build_app(pooled_sessions)) as limited,
+        limited.websocket_connect("/ws/practice") as session,
+    ):
         authenticate(session)
         session.send_json(start())
         for seq in range(2):

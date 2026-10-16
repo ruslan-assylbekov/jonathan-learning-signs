@@ -13,8 +13,10 @@ from dataclasses import dataclass
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import TypeAdapter, ValidationError
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.application.evaluate_gesture import PracticeSession
+from app.application.record_attempt import AttemptRecord, Attempts
 from app.domain.gesture.features import Handedness, InvalidLandmarksError, aspect_of
 from app.domain.ports import GestureClassifier, LetterCatalog, TemplateSource, TokenVerifier
 from app.presentation.ws.schemas import (
@@ -42,6 +44,7 @@ class PracticeDeps:
     templates: TemplateSource
     letters: LetterCatalog
     tokens: TokenVerifier
+    attempts: Attempts
     confidence_threshold: float
     hold_frames: int
     max_fps: int
@@ -78,12 +81,37 @@ async def practice(websocket: WebSocket) -> None:
         logger.debug("practice socket closed by the client")
 
 
+@dataclass
+class Attendance:
+    """What the current target's attempt will be made of."""
+
+    letter_id: int
+    mode: str
+    started_at: float
+    frames: int = 0
+    confidence_total: float = 0.0
+
+    def saw(self, confidence: float) -> None:
+        self.frames += 1
+        self.confidence_total += confidence
+
+    def to_record(self, user_id: int, *, success: bool, elapsed_ms: float) -> AttemptRecord:
+        return AttemptRecord(
+            user_id=user_id,
+            letter_id=self.letter_id,
+            mode=self.mode,
+            success=success,
+            time_to_success_ms=elapsed_ms if success else None,
+            avg_confidence=self.confidence_total / self.frames if self.frames else None,
+            frames_count=self.frames,
+        )
+
+
 async def _converse(websocket: WebSocket, deps: PracticeDeps) -> None:
     limiter = FrameRateLimiter(deps.max_fps)
-    authenticated = False
+    user_id: int | None = None
     session: PracticeSession | None = None
-    letter_id: int | None = None
-    started_at: float | None = None
+    attendance: Attendance | None = None
 
     while True:
         payload = await websocket.receive_json()
@@ -94,12 +122,12 @@ async def _converse(websocket: WebSocket, deps: PracticeDeps) -> None:
             continue
 
         if isinstance(message, AuthMessage):
-            authenticated = deps.tokens.verify(message.token)
-            if not authenticated:
+            user_id = deps.tokens.user_id(message.token)
+            if user_id is None:
                 await _fail(websocket, "UNAUTHENTICATED", "token rejected")
             continue
 
-        if not authenticated:
+        if user_id is None:
             await _fail(websocket, "UNAUTHENTICATED", "send an auth message first")
             continue
 
@@ -109,19 +137,24 @@ async def _converse(websocket: WebSocket, deps: PracticeDeps) -> None:
                 await _fail(websocket, "UNKNOWN_LETTER", f"no letter {message.letter_id}")
                 continue
             session = await _new_session(message, letter.symbol, deps)
-            letter_id = letter.id
-            started_at = time.perf_counter()
+            attendance = Attendance(
+                letter_id=letter.id, mode=message.mode, started_at=time.perf_counter()
+            )
             continue
 
         if isinstance(message, StopMessage):
-            session, letter_id, started_at = None, None, None
+            # Giving up is a result too: without this, every unfinished letter
+            # would silently vanish and progress would only ever see successes.
+            if attendance is not None and attendance.frames:
+                await _record(deps, attendance, user_id, success=False)
+            session, attendance = None, None
             continue
 
-        if session is None or letter_id is None or started_at is None:
+        if session is None or attendance is None:
             await _fail(websocket, "NOT_STARTED", "send a start message first")
             continue
 
-        await _handle_frame(websocket, message, session, deps, limiter, letter_id, started_at)
+        await _handle_frame(websocket, message, session, deps, limiter, attendance, user_id)
 
 
 async def _new_session(message: StartMessage, target: str, deps: PracticeDeps) -> PracticeSession:
@@ -143,8 +176,8 @@ async def _handle_frame(
     session: PracticeSession,
     deps: PracticeDeps,
     limiter: FrameRateLimiter,
-    letter_id: int,
-    started_at: float,
+    attendance: Attendance,
+    user_id: int,
 ) -> None:
     if not limiter.allow(time.monotonic()):
         return  # dropped on purpose; the client is over its frame budget
@@ -160,6 +193,7 @@ async def _handle_frame(
         await _fail(websocket, "INVALID_FRAME", str(error))
         return
     elapsed_ms = (time.perf_counter() - began) * 1000
+    attendance.saw(evaluation.prediction.confidence)
 
     await websocket.send_text(
         EvalOut.of(
@@ -168,12 +202,34 @@ async def _handle_frame(
     )
 
     if evaluation.succeeded:
+        taken_ms = round((time.perf_counter() - attendance.started_at) * 1000, 1)
         await websocket.send_text(
             SuccessOut(
-                letter_id=letter_id,
-                time_to_success_ms=round((time.perf_counter() - started_at) * 1000, 1),
+                letter_id=attendance.letter_id, time_to_success_ms=taken_ms
             ).model_dump_json()
         )
+        await _record(deps, attendance, user_id, success=True, elapsed_ms=taken_ms)
+
+
+async def _record(
+    deps: PracticeDeps,
+    attendance: Attendance,
+    user_id: int,
+    *,
+    success: bool,
+    elapsed_ms: float = 0.0,
+) -> None:
+    """Store the attempt, never at the cost of the session.
+
+    A database hiccup must not drop the learner's connection mid-practice, so
+    it is logged and the lesson continues.
+    """
+    try:
+        await deps.attempts.record(
+            attendance.to_record(user_id, success=success, elapsed_ms=elapsed_ms)
+        )
+    except SQLAlchemyError:
+        logger.exception("could not record attempt for letter %s", attendance.letter_id)
 
 
 async def _fail(websocket: WebSocket, code: str, detail: str) -> None:

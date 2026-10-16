@@ -54,7 +54,7 @@ are not committed.
 
 ```bash
 docker compose up -d postgres redis   # integration tests need it
-cd backend && uv run pytest           # 84 tests
+cd backend && uv run pytest           # 98 tests
 uv run ruff check . ../ml && uv run mypy app tests ../ml
 cd ../frontend && npm run build    # type-checks, then bundles
 ```
