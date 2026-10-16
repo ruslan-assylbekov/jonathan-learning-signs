@@ -276,6 +276,16 @@ Rules:
   (tokens must not appear in Nginx access logs).
 - Client throttles frames to 10–15 Hz. Server drops frames above 30 Hz per
   connection and validates shape (exactly 21 × 3 finite floats).
+- `handedness` is the **physical** hand, and `mirrored` describes the **pixels**
+  — one meaning per field. MediaPipe's own label assumes a selfie-flipped
+  image ("handedness is determined assuming the input image is mirrored […] If
+  it is not the case, please swap the handedness output in the application"),
+  and `getUserMedia` does not flip, so the client swaps the label before
+  sending and sets `mirrored: false`. Mirroring the preview in CSS does not
+  flip the pixels MediaPipe sees, so it does not make `mirrored` true.
+  `ml/bukva/extract_landmarks.py` must apply the same rule to dataset videos:
+  getting this wrong trains the model in a mirrored feature space and shows up
+  only as unexplained inaccuracy.
 - `seq` and `t_client` are echoed so the client can compute round-trip latency.
 - Frame size travels in `start`, not in every frame: it is a property of the
   camera stream, and repeating it 15 times a second would inflate the payload

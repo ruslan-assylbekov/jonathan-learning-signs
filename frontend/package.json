@@ -1,0 +1,19 @@
+{
+  "name": "sign-assistant-frontend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "vendor": "node scripts/vendor-mediapipe.mjs"
+  },
+  "dependencies": {
+    "@mediapipe/tasks-vision": "0.10.21"
+  },
+  "devDependencies": {
+    "typescript": "5.7.3",
+    "vite": "6.0.11"
+  }
+}

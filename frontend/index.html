@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sign Language Learning Assistant</title>
+  </head>
+  <body>
+    <header>
+      <h1>Sign Language Learning Assistant</h1>
+      <p id="status">Loading…</p>
+    </header>
+
+    <p id="banner" class="banner" hidden>
+      <strong>Stub mode.</strong> No model is trained yet, so these targets are
+      ordinary hand gestures, not sign language. They exist to exercise the
+      camera, the overlay and the feedback loop.
+    </p>
+
+    <main>
+      <section class="stage">
+        <div class="video-wrap">
+          <video id="video" playsinline muted></video>
+          <canvas id="overlay"></canvas>
+        </div>
+        <div class="row">
+          <button id="start" disabled>Start camera</button>
+          <label for="target">Target</label>
+          <select id="target"></select>
+        </div>
+        <p id="stats" class="stats"></p>
+      </section>
+
+      <aside class="panel">
+        <h2 id="feedback">Show your hand to the camera.</h2>
+        <p id="target-detail" class="muted"></p>
+        <div class="meter"><div id="hold-bar"></div></div>
+        <ul id="hints"></ul>
+        <p class="muted">Detected: <span id="detected">–</span></p>
+      </aside>
+    </main>
+  </body>
+  <script type="module" src="/src/main.ts"></script>
+</html>
