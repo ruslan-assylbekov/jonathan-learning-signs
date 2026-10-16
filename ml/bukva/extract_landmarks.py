@@ -42,6 +42,17 @@ NUM_LANDMARKS = 21
 DEFAULT_FRAMES_PER_VIDEO = 8
 DEFAULT_CHUNK = 60
 
+DEFAULT_WORKERS = 4
+"""Deliberately not the CPU count.
+
+Each worker holds its own MediaPipe graph, and TFLite refuses to allocate its
+tensors once memory runs short -- which it reports as an unreadable RET_CHECK
+failure rather than an out-of-memory error. On a 16 GB machine also running
+Docker and a dev server, four workers fit and ten do not. Raise it with
+``--workers`` on a roomier machine; the run is resumable, so a failed attempt
+costs only the chunks that were in flight.
+"""
+
 #: The same .task file the browser loads, so training and inference see the
 #: same detector (CLAUDE.md 8.2).
 MODEL_RELATIVE = Path("frontend/public/mediapipe/hand_landmarker.task")
@@ -123,7 +134,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--min-score", type=float, default=0.5)
     parser.add_argument("--chunk", type=int, default=DEFAULT_CHUNK)
-    parser.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 4) - 1))
+    parser.add_argument("--workers", type=int, default=DEFAULT_WORKERS)
     parser.add_argument("--limit", type=int, help="process only the first N videos (smoke test)")
     return parser.parse_args()
 
@@ -166,11 +177,8 @@ def run_chunks(pending: list[dict[str, Any]], args: argparse.Namespace) -> None:
     report = ChunkReport()
     print(f"{len(chunks)} chunks across {args.workers} workers")
 
-    with Pool(
-        args.workers,
-        initializer=init_worker,
-        initargs=(str(args.model), args.min_score),
-    ) as pool:
+    pool = Pool(args.workers, initializer=init_worker, initargs=(str(args.model), args.min_score))
+    try:
         for index, (rows, chunk_report) in enumerate(
             pool.imap_unordered(process_chunk, chunks), start=1
         ):
@@ -179,7 +187,16 @@ def run_chunks(pending: list[dict[str, Any]], args: argparse.Namespace) -> None:
                 shard = args.shards / f"shard-{index:05d}-{os.getpid()}.parquet"
                 pd.DataFrame(rows).to_parquet(shard, index=False)
             kept = sum(report.frames_kept.values())
-            print(f"  chunk {index}/{len(chunks)}: {report.videos} videos, {kept} frames kept")
+            print(
+                f"  chunk {index}/{len(chunks)}: {report.videos} videos, {kept} frames kept",
+                flush=True,
+            )
+    finally:
+        # terminate, not close/join: a worker holding MediaPipe's native
+        # threads does not always return from a clean shutdown, and the run
+        # then hangs after every shard is already safely on disk.
+        pool.terminate()
+        pool.join()
 
     write_report(args, report)
 
@@ -193,7 +210,17 @@ _LANDMARKER: Any = None
 
 def init_worker(model: str, min_score: float) -> None:
     global _LANDMARKER
-    _LANDMARKER = make_landmarker(model, min_score)
+    try:
+        _LANDMARKER = make_landmarker(model, min_score)
+    except RuntimeError as error:
+        # TFLite reports a failed tensor allocation as an opaque RET_CHECK,
+        # never as "out of memory", which sends you looking in the wrong place.
+        raise RuntimeError(
+            "could not start a hand detector in this worker, which usually "
+            "means memory ran short. Try fewer --workers (the default is "
+            f"{DEFAULT_WORKERS}) or close other heavy processes. Underlying "
+            f"error: {error}"
+        ) from error
 
 
 def process_chunk(jobs: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], ChunkReport]:
@@ -249,20 +276,23 @@ def extract_one(
     wanted = evenly_spaced(total, job["frames_per_video"])
     report.videos += 1
 
-    # Decoding is cheap and seeking is not reliable across these codecs, so
-    # every frame is read but only the sampled ones are run through the model.
-    # Sampling at all is what stops eight near-identical frames from one clip
-    # outweighing a whole other signer.
+    # grab() walks the stream without decoding a frame into memory; only the
+    # sampled frames are retrieved. At 1080x1920 a decoded frame is ~6 MB, so
+    # decoding all of them across parallel workers exhausted OpenCV's
+    # allocator. Seeking instead of walking is not reliable across the codecs
+    # in this dataset. Sampling at all is what stops eight near-identical
+    # frames from one clip outweighing a whole other signer.
     index = 0
-    while True:
-        ok, frame = capture.read()
-        if not ok:
-            break
+    while capture.grab():
         if index in wanted:
-            image = mp.Image(
-                image_format=mp.ImageFormat.SRGB, data=cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            )
-            record(landmarker.detect(image), job, index, width, height, rows, report)
+            ok, frame = capture.retrieve()
+            if ok:
+                image = mp.Image(
+                    image_format=mp.ImageFormat.SRGB,
+                    data=cv2.cvtColor(frame, cv2.COLOR_BGR2RGB),
+                )
+                record(landmarker.detect(image), job, index, width, height, rows, report)
+                del frame
         index += 1
 
     capture.release()
