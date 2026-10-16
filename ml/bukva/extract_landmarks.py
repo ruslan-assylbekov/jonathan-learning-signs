@@ -77,6 +77,7 @@ class ChunkReport:
     frames_no_hand: Counter[str] = field(default_factory=Counter)
     frames_low_score: Counter[str] = field(default_factory=Counter)
     videos_unreadable: list[str] = field(default_factory=list)
+    videos_failed: dict[str, str] = field(default_factory=dict)
 
     def merge(self, other: ChunkReport) -> None:
         self.videos += other.videos
@@ -84,6 +85,7 @@ class ChunkReport:
         self.frames_no_hand += other.frames_no_hand
         self.frames_low_score += other.frames_low_score
         self.videos_unreadable += other.videos_unreadable
+        self.videos_failed |= other.videos_failed
 
 
 def main() -> None:
@@ -224,11 +226,21 @@ def init_worker(model: str, min_score: float) -> None:
 
 
 def process_chunk(jobs: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], ChunkReport]:
-    """One worker's share of the videos, through its process-wide detector."""
+    """One worker's share of the videos, through its process-wide detector.
+
+    A single unreadable clip must not take the run down with it. In a
+    crowdsourced set of 3,862 phone recordings something will always be
+    malformed, and losing an hour of extraction to one of them -- along with
+    every other clip its chunk had already done -- is the wrong trade. The
+    offender is named in the report instead.
+    """
     rows: list[dict[str, Any]] = []
     report = ChunkReport()
     for job in jobs:
-        extract_one(_LANDMARKER, job, rows, report)
+        try:
+            extract_one(_LANDMARKER, job, rows, report)
+        except (OSError, cv2.error, ValueError) as error:
+            report.videos_failed[job["video_id"]] = f"{type(error).__name__}: {error}"
     return rows, report
 
 
@@ -389,6 +401,7 @@ def write_report(args: argparse.Namespace, report: ChunkReport) -> None:
         "frames_dropped_no_hand": dict(report.frames_no_hand),
         "frames_dropped_low_score": dict(report.frames_low_score),
         "videos_unreadable": report.videos_unreadable,
+        "videos_failed": report.videos_failed,
         "frames_per_video": args.frames_per_video,
         "min_score": args.min_score,
     }
@@ -399,6 +412,10 @@ def write_report(args: argparse.Namespace, report: ChunkReport) -> None:
     print(f"\nkept {kept} frames, dropped {dropped}; report at {path}")
     if report.videos_unreadable:
         print(f"  {len(report.videos_unreadable)} videos could not be opened")
+    if report.videos_failed:
+        print(f"  {len(report.videos_failed)} videos failed mid-extraction:")
+        for video_id, reason in list(report.videos_failed.items())[:5]:
+            print(f"    {video_id}: {reason}")
 
     worst = sorted(report.frames_no_hand.items(), key=lambda item: item[1], reverse=True)[:5]
     if worst:
