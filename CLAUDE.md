@@ -194,15 +194,25 @@ logic in `ml/` or in the frontend. The browser sends **raw** MediaPipe
 landmarks; all normalization happens on the server.
 
 ### 6.2 Feature extraction steps
-1. Input: 21 landmarks `(x, y, z)` from MediaPipe + `handedness` + `mirrored`.
+1. Input: 21 landmarks `(x, y, z)` from MediaPipe + `handedness` + `mirrored`
+   + the frame aspect ratio (`width / height`).
 2. If `mirrored` is true, undo the mirror (`x → 1 - x`) and flip handedness.
    (Browser video is usually mirrored for the user; MediaPipe handedness
    labels flip with it — this is a known source of bugs.)
 3. Convert left hand to right hand by reflecting X, so one model covers both.
-4. Translate so the wrist (landmark 0) is the origin.
-5. Scale by the distance wrist → middle finger MCP (landmark 9).
-6. Output vector: 63 normalized coordinates + 15 joint flexion angles
+4. Correct the aspect ratio: `x *= aspect` and `z *= aspect`. MediaPipe
+   normalizes `x` by frame width but `y` by frame height, so on a non-square
+   frame the hand arrives anisotropically stretched and the flexion angles are
+   skewed; `z` shares the scale of `x`. Steps 2 and 3 run **before** this one,
+   while the mirror axis is still `x = 0.5`.
+5. Translate so the wrist (landmark 0) is the origin.
+6. Scale by the distance wrist → middle finger MCP (landmark 9).
+7. Output vector: 63 normalized coordinates + 15 joint flexion angles
    (3 per finger), in degrees.
+
+`aspect` is a required argument, never defaulted: a silently wrong aspect
+produces plausible-looking but wrong features. Bukva's `annotations.tsv`
+carries `width`/`height`; the browser reads `videoWidth`/`videoHeight`.
 
 ### 6.3 Versioning
 - `FEATURE_VERSION` constant in `features.py`. Bump it on **any** change to
@@ -244,7 +254,7 @@ in the same commit, plus integration tests.
 **Client → server**
 ```json
 {"type": "auth", "token": "<JWT>"}
-{"type": "start", "mode": "learn", "letter_id": 5}
+{"type": "start", "mode": "learn", "letter_id": 5, "width": 1280, "height": 720}
 {"type": "frame", "seq": 123, "t_client": 1712345678.123,
  "handedness": "Right", "mirrored": true,
  "landmarks": [[0.51, 0.62, -0.03], "... 21 items total"]}
@@ -267,6 +277,12 @@ Rules:
 - Client throttles frames to 10–15 Hz. Server drops frames above 30 Hz per
   connection and validates shape (exactly 21 × 3 finite floats).
 - `seq` and `t_client` are echoed so the client can compute round-trip latency.
+- Frame size travels in `start`, not in every frame: it is a property of the
+  camera stream, and repeating it 15 times a second would inflate the payload
+  the bandwidth experiment (§16.1) measures. The client **must** send a new
+  `start` whenever the resolution changes — switching camera, or a phone
+  rotating — otherwise every later frame is normalized with a stale aspect
+  ratio. Server rejects `width`/`height` that are not positive integers.
 - No endpoint in the application accepts images or video. Ever.
 
 ---

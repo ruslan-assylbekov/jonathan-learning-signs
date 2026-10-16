@@ -61,6 +61,16 @@ def hand(
     return points
 
 
+def project(landmarks: Landmarks, width: int, height: int) -> Landmarks:
+    """Normalize pixel coordinates the way MediaPipe does.
+
+    ``x`` is divided by frame width, ``y`` by frame height, and ``z`` shares the
+    scale of ``x``. Feed it a hand built in pixels to simulate the same physical
+    hand being seen at different resolutions.
+    """
+    return [[x / width, y / height, z / width] for x, y, z in landmarks]
+
+
 def mirror(landmarks: Landmarks) -> Landmarks:
     """Horizontally flip landmarks the way a mirrored camera preview does."""
     return [[1.0 - x, y, z] for x, y, z in landmarks]

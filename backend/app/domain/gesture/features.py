@@ -10,16 +10,18 @@ Pipeline (CLAUDE.md 6.2):
    video was mirrored.
 2. Undo mirroring (``x -> 1 - x``) and flip the handedness label with it.
 3. Reflect left hands into right hands, so one model covers both.
-4. Translate the wrist (landmark 0) to the origin.
-5. Scale by the wrist -> middle-finger-MCP distance (landmark 9).
-6. Emit 63 normalized coordinates followed by 15 joint flexion angles in
+4. Correct the frame aspect ratio: ``x *= aspect`` and ``z *= aspect``.
+5. Translate the wrist (landmark 0) to the origin.
+6. Scale by the wrist -> middle-finger-MCP distance (landmark 9).
+7. Emit 63 normalized coordinates followed by 15 joint flexion angles in
    degrees (3 per finger, thumb to pinky).
 
-Known limitation: MediaPipe normalizes ``x`` by frame width and ``y`` by frame
-height, so on a non-square frame the hand is anisotropically stretched and the
-angles below are skewed by the aspect ratio. Correcting it needs the frame
-dimensions, which the WebSocket protocol (CLAUDE.md 7) does not carry. Left as
-is deliberately; revisit together with a protocol change.
+Why step 4 exists: MediaPipe normalizes ``x`` by frame width but ``y`` by frame
+height, so on a non-square frame the hand arrives anisotropically stretched and
+the flexion angles come out skewed -- the same physical hand would yield
+different features at 640x480 and at 1280x720. ``z`` shares the scale of ``x``,
+so it is corrected alongside it. Steps 2 and 3 deliberately run first, while
+the mirror axis is still ``x = 0.5``.
 """
 
 from __future__ import annotations
@@ -33,8 +35,11 @@ from typing import Final
 import numpy as np
 import numpy.typing as npt
 
-FEATURE_VERSION: Final = 1
-"""Bump on ANY change to the steps above. A bump means: retrain, new artifact."""
+FEATURE_VERSION: Final = 2
+"""Bump on ANY change to the steps above. A bump means: retrain, new artifact.
+
+v2 added the aspect-ratio correction (step 4).
+"""
 
 NUM_LANDMARKS: Final = 21
 NUM_COORDS: Final = NUM_LANDMARKS * 3
@@ -76,6 +81,17 @@ class InvalidLandmarksError(ValueError):
     """
 
 
+def aspect_of(width: int, height: int) -> float:
+    """Frame aspect ratio for :func:`extract_features`.
+
+    Call once per stream: the WebSocket session takes ``width``/``height`` from
+    the ``start`` message, the ``ml/`` scripts from the dataset annotations.
+    """
+    if width <= 0 or height <= 0:
+        raise InvalidLandmarksError(f"frame size must be positive, got {width}x{height}")
+    return width / height
+
+
 @dataclass(frozen=True, slots=True)
 class Features:
     """Everything derived from one frame, computed once.
@@ -92,6 +108,7 @@ def extract_features(
     landmarks: Sequence[Sequence[float]],
     handedness: Handedness,
     *,
+    aspect: float,
     mirrored: bool = False,
 ) -> Features:
     """Normalize one frame of MediaPipe landmarks into a feature vector.
@@ -101,14 +118,19 @@ def extract_features(
         handedness: the label MediaPipe assigned to the detected hand. If
             ``mirrored`` is true this is the label for the mirrored image, and
             it is flipped here.
+        aspect: frame width divided by frame height, from :func:`aspect_of`.
+            Required on purpose -- a wrong aspect yields features that look
+            plausible but are not comparable with the training data.
         mirrored: true when the source frame was horizontally flipped, as
             browser preview video usually is.
 
     Raises:
-        InvalidLandmarksError: wrong shape, non-finite values, or a hand too
-            degenerate to normalize (zero-length bones).
+        InvalidLandmarksError: wrong shape, non-finite values, a non-positive
+            aspect, or a hand too degenerate to normalize (zero-length bones).
     """
     points = _as_points(landmarks)
+    if not math.isfinite(aspect) or aspect <= 0.0:
+        raise InvalidLandmarksError(f"aspect must be a positive number, got {aspect!r}")
 
     if mirrored:
         points = _reflect_x(points)
@@ -116,6 +138,8 @@ def extract_features(
 
     if handedness is Handedness.LEFT:
         points = _reflect_x(points)
+
+    points = points * np.array([aspect, 1.0, aspect])
 
     points = points - points[WRIST]
 

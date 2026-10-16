@@ -16,6 +16,7 @@ from app.domain.gesture.features import (
     Features,
     Handedness,
     InvalidLandmarksError,
+    aspect_of,
     extract_features,
 )
 from tests import synthetic
@@ -29,8 +30,11 @@ BENT = {
 }
 
 
-def right(landmarks: list[list[float]], *, mirrored: bool = False) -> Features:
-    return extract_features(landmarks, Handedness.RIGHT, mirrored=mirrored)
+def right(landmarks: list[list[float]], *, aspect: float = 1.0, mirrored: bool = False) -> Features:
+    """Extract as a right hand. A square frame leaves the coordinates alone,
+    so the invariants below are checked without the aspect correction in play;
+    the aspect tests at the end exercise it on its own."""
+    return extract_features(landmarks, Handedness.RIGHT, aspect=aspect, mirrored=mirrored)
 
 
 def test_vector_has_the_documented_shape() -> None:
@@ -88,7 +92,9 @@ def test_mirrored_flag_undoes_a_mirrored_frame() -> None:
 
     # A mirrored preview flips the image and MediaPipe's handedness label with
     # it, so the same physical right hand arrives labelled "Left".
-    from_preview = extract_features(synthetic.mirror(landmarks), Handedness.LEFT, mirrored=True)
+    from_preview = extract_features(
+        synthetic.mirror(landmarks), Handedness.LEFT, aspect=1.0, mirrored=True
+    )
 
     assert from_preview.vector == pytest.approx(right(landmarks).vector)
 
@@ -97,7 +103,7 @@ def test_left_hand_is_folded_onto_the_right() -> None:
     right_hand = synthetic.hand(BENT)
     left_hand = synthetic.mirror(right_hand)
 
-    from_left = extract_features(left_hand, Handedness.LEFT)
+    from_left = extract_features(left_hand, Handedness.LEFT, aspect=1.0)
 
     assert from_left.vector == pytest.approx(right(right_hand).vector)
 
@@ -158,6 +164,72 @@ def test_rejects_a_zero_length_bone() -> None:
 
     with pytest.raises(InvalidLandmarksError):
         right(landmarks)
+
+
+def test_same_physical_hand_matches_across_resolutions() -> None:
+    """The point of the aspect correction (CLAUDE.md 6.2, step 4).
+
+    One hand in pixel space, seen through a 16:9 and a 4:3 camera, must produce
+    the same features.
+    """
+    in_pixels = synthetic.hand(BENT, wrist=(640.0, 520.0, 0.0), segment=48.0)
+
+    widescreen = right(synthetic.project(in_pixels, 1280, 720), aspect=aspect_of(1280, 720))
+    classic = right(synthetic.project(in_pixels, 640, 480), aspect=aspect_of(640, 480))
+
+    assert widescreen.vector == pytest.approx(classic.vector)
+
+
+def test_without_the_correction_the_resolutions_would_disagree() -> None:
+    """Guards the test above against passing for the wrong reason."""
+    in_pixels = synthetic.hand(BENT, wrist=(640.0, 520.0, 0.0), segment=48.0)
+
+    uncorrected_wide = right(synthetic.project(in_pixels, 1280, 720))
+    uncorrected_classic = right(synthetic.project(in_pixels, 640, 480))
+
+    assert not np.allclose(uncorrected_wide.vector, uncorrected_classic.vector)
+
+
+def test_a_widescreen_frame_skews_the_angles_when_uncorrected() -> None:
+    in_pixels = synthetic.hand(BENT, wrist=(640.0, 520.0, 0.0), segment=48.0)
+    squashed = synthetic.project(in_pixels, 1280, 720)
+
+    corrected = right(squashed, aspect=aspect_of(1280, 720))
+    uncorrected = right(squashed)
+
+    assert corrected.angles["index"]["pip"] == pytest.approx(BENT["index"][1])
+    assert uncorrected.angles["index"]["pip"] != pytest.approx(BENT["index"][1], abs=1.0)
+
+
+def test_aspect_correction_survives_mirroring_and_a_left_hand() -> None:
+    """Steps 2 and 3 run before step 4, so the mirror axis is still x = 0.5."""
+    in_pixels = synthetic.hand(BENT, wrist=(640.0, 520.0, 0.0), segment=48.0)
+    normalized = synthetic.project(in_pixels, 1280, 720)
+    aspect = aspect_of(1280, 720)
+
+    direct = right(normalized, aspect=aspect)
+    from_preview = extract_features(
+        synthetic.mirror(normalized), Handedness.LEFT, aspect=aspect, mirrored=True
+    )
+
+    assert from_preview.vector == pytest.approx(direct.vector)
+
+
+def test_aspect_of_reads_frame_size() -> None:
+    assert aspect_of(1280, 720) == pytest.approx(16 / 9)
+    assert aspect_of(480, 480) == pytest.approx(1.0)
+
+
+@pytest.mark.parametrize(("width", "height"), [(0, 720), (1280, 0), (-1280, 720), (1280, -720)])
+def test_aspect_of_rejects_impossible_frame_sizes(width: int, height: int) -> None:
+    with pytest.raises(InvalidLandmarksError):
+        aspect_of(width, height)
+
+
+@pytest.mark.parametrize("aspect", [0.0, -1.5, math.nan, math.inf])
+def test_rejects_an_impossible_aspect(aspect: float) -> None:
+    with pytest.raises(InvalidLandmarksError):
+        right(synthetic.hand(), aspect=aspect)
 
 
 def _rotate(point: list[float], about: list[float], degrees: float) -> tuple[float, float, float]:
