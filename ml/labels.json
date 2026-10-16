@@ -1,0 +1,9 @@
+{
+  "comment": "Class index <-> label for the MVP classifier. Static letters only, from docs/alphabet.md, plus no_sign. Dynamic letters are excluded because a single frame cannot distinguish them.",
+  "classes": [
+    "А", "Б", "В", "Г", "Е", "Ж", "И", "К", "Л", "М", "Н", "О", "П",
+    "Р", "С", "Т", "У", "Ф", "Х", "Ч", "Ш", "Ы", "Э", "Ю", "Я",
+    "no_sign"
+  ],
+  "excluded_dynamic": ["Д", "Ё", "З", "Й", "Ц", "Щ", "Ъ", "Ь"]
+}

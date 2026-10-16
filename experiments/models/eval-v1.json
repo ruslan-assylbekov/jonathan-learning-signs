@@ -1,0 +1,240 @@
+{
+  "model": "model-v1 (logreg)",
+  "test_frames": 3694,
+  "test_signers": 20,
+  "accuracy": 0.6825,
+  "macro_f1": 0.7087,
+  "per_class": {
+    "no_sign": {
+      "precision": 0.0356,
+      "recall": 0.2571,
+      "f1": 0.0626,
+      "support": 70
+    },
+    "А": {
+      "precision": 0.7348,
+      "recall": 0.6879,
+      "f1": 0.7106,
+      "support": 141
+    },
+    "Б": {
+      "precision": 0.824,
+      "recall": 0.7153,
+      "f1": 0.7658,
+      "support": 144
+    },
+    "В": {
+      "precision": 0.6758,
+      "recall": 0.8146,
+      "f1": 0.7387,
+      "support": 151
+    },
+    "Г": {
+      "precision": 0.9151,
+      "recall": 0.6382,
+      "f1": 0.7519,
+      "support": 152
+    },
+    "Е": {
+      "precision": 0.7197,
+      "recall": 0.6463,
+      "f1": 0.681,
+      "support": 147
+    },
+    "Ж": {
+      "precision": 0.6613,
+      "recall": 0.5899,
+      "f1": 0.6236,
+      "support": 139
+    },
+    "И": {
+      "precision": 0.8785,
+      "recall": 0.6483,
+      "f1": 0.746,
+      "support": 145
+    },
+    "К": {
+      "precision": 0.8131,
+      "recall": 0.6084,
+      "f1": 0.696,
+      "support": 143
+    },
+    "Л": {
+      "precision": 0.7788,
+      "recall": 0.5664,
+      "f1": 0.6559,
+      "support": 143
+    },
+    "М": {
+      "precision": 0.7297,
+      "recall": 0.5548,
+      "f1": 0.6304,
+      "support": 146
+    },
+    "Н": {
+      "precision": 0.916,
+      "recall": 0.7124,
+      "f1": 0.8015,
+      "support": 153
+    },
+    "О": {
+      "precision": 0.7063,
+      "recall": 0.7584,
+      "f1": 0.7314,
+      "support": 149
+    },
+    "П": {
+      "precision": 0.7174,
+      "recall": 0.6828,
+      "f1": 0.6996,
+      "support": 145
+    },
+    "Р": {
+      "precision": 0.7333,
+      "recall": 0.6875,
+      "f1": 0.7097,
+      "support": 144
+    },
+    "С": {
+      "precision": 0.8739,
+      "recall": 0.7172,
+      "f1": 0.7879,
+      "support": 145
+    },
+    "Т": {
+      "precision": 0.6452,
+      "recall": 0.5442,
+      "f1": 0.5904,
+      "support": 147
+    },
+    "У": {
+      "precision": 0.6831,
+      "recall": 0.8224,
+      "f1": 0.7463,
+      "support": 152
+    },
+    "Ф": {
+      "precision": 0.803,
+      "recall": 0.797,
+      "f1": 0.8,
+      "support": 133
+    },
+    "Х": {
+      "precision": 0.8305,
+      "recall": 0.6806,
+      "f1": 0.7481,
+      "support": 144
+    },
+    "Ч": {
+      "precision": 0.8729,
+      "recall": 0.7203,
+      "f1": 0.7893,
+      "support": 143
+    },
+    "Ш": {
+      "precision": 0.8833,
+      "recall": 0.7794,
+      "f1": 0.8281,
+      "support": 136
+    },
+    "Ы": {
+      "precision": 0.9016,
+      "recall": 0.719,
+      "f1": 0.8,
+      "support": 153
+    },
+    "Э": {
+      "precision": 0.8346,
+      "recall": 0.7571,
+      "f1": 0.794,
+      "support": 140
+    },
+    "Ю": {
+      "precision": 0.864,
+      "recall": 0.7606,
+      "f1": 0.809,
+      "support": 142
+    },
+    "Я": {
+      "precision": 0.8151,
+      "recall": 0.6599,
+      "f1": 0.7293,
+      "support": 147
+    }
+  },
+  "top_confusions": [
+    {
+      "true": "Ж",
+      "predicted": "no_sign",
+      "frames": 35,
+      "share_of_true": 0.2518
+    },
+    {
+      "true": "Т",
+      "predicted": "no_sign",
+      "frames": 29,
+      "share_of_true": 0.1973
+    },
+    {
+      "true": "Г",
+      "predicted": "no_sign",
+      "frames": 28,
+      "share_of_true": 0.1842
+    },
+    {
+      "true": "Х",
+      "predicted": "no_sign",
+      "frames": 25,
+      "share_of_true": 0.1736
+    },
+    {
+      "true": "П",
+      "predicted": "no_sign",
+      "frames": 25,
+      "share_of_true": 0.1724
+    },
+    {
+      "true": "Ш",
+      "predicted": "no_sign",
+      "frames": 23,
+      "share_of_true": 0.1691
+    },
+    {
+      "true": "Л",
+      "predicted": "no_sign",
+      "frames": 24,
+      "share_of_true": 0.1678
+    },
+    {
+      "true": "Я",
+      "predicted": "no_sign",
+      "frames": 23,
+      "share_of_true": 0.1565
+    },
+    {
+      "true": "О",
+      "predicted": "no_sign",
+      "frames": 23,
+      "share_of_true": 0.1544
+    },
+    {
+      "true": "М",
+      "predicted": "no_sign",
+      "frames": 21,
+      "share_of_true": 0.1438
+    }
+  ],
+  "threshold": {
+    "value": 0.7,
+    "correct_frames_passing": 0.8572,
+    "wrong_frames_passing_as_a_letter": 0.0252,
+    "letter_frames_usable_for_hold": 0.5958
+  },
+  "per_video_majority": {
+    "videos": 517,
+    "accuracy": 0.7737
+  },
+  "not_measured": [
+    "accuracy on own webcam data (CLAUDE.md 8.4 domain-shift check): no webcam set recorded yet"
+  ]
+}

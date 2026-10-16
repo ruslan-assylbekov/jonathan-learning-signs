@@ -105,7 +105,7 @@ class Features:
 
 
 def extract_features(
-    landmarks: Sequence[Sequence[float]],
+    landmarks: Sequence[Sequence[float]] | npt.NDArray[np.float64],
     handedness: Handedness,
     *,
     aspect: float,
@@ -155,7 +155,9 @@ def extract_features(
     return Features(vector=vector, angles=angles)
 
 
-def _as_points(landmarks: Sequence[Sequence[float]]) -> npt.NDArray[np.float64]:
+def _as_points(
+    landmarks: Sequence[Sequence[float]] | npt.NDArray[np.float64],
+) -> npt.NDArray[np.float64]:
     if len(landmarks) != NUM_LANDMARKS:
         raise InvalidLandmarksError(f"expected {NUM_LANDMARKS} landmarks, got {len(landmarks)}")
     try:

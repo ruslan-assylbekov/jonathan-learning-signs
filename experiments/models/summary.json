@@ -1,0 +1,46 @@
+{
+  "ranking": [
+    {
+      "model": "logreg",
+      "accuracy_mean": 0.7609,
+      "accuracy_std": 0.0212,
+      "macro_f1_mean": 0.7588,
+      "macro_f1_std": 0.0126,
+      "fit_seconds_mean": 13.87
+    },
+    {
+      "model": "mlp",
+      "accuracy_mean": 0.7544,
+      "accuracy_std": 0.0293,
+      "macro_f1_mean": 0.7469,
+      "macro_f1_std": 0.02,
+      "fit_seconds_mean": 22.828
+    },
+    {
+      "model": "random_forest",
+      "accuracy_mean": 0.7435,
+      "accuracy_std": 0.024,
+      "macro_f1_mean": 0.7424,
+      "macro_f1_std": 0.0169,
+      "fit_seconds_mean": 7.174
+    },
+    {
+      "model": "knn",
+      "accuracy_mean": 0.7027,
+      "accuracy_std": 0.0278,
+      "macro_f1_mean": 0.6894,
+      "macro_f1_std": 0.0195,
+      "fit_seconds_mean": 0.06
+    }
+  ],
+  "chosen": "logreg",
+  "test": {
+    "accuracy": 0.6824580400649702,
+    "macro_f1": 0.7087340493242826
+  },
+  "latency_model_only": {
+    "median_ms": 0.1848,
+    "p95_ms": 0.5079,
+    "samples": 500
+  }
+}

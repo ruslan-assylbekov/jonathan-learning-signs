@@ -552,18 +552,21 @@ Link each design decision to concepts from the course lectures and readings
 
 Update checkboxes as work progresses.
 
-- [ ] **M0 — Setup:** Bukva license checked, static letter subset in
+- [x] **M0 — Setup:** Bukva license checked, static letter subset in
       `docs/alphabet.md`, repo skeleton,
       Makefile, docker-compose, FastAPI `/health`, CI running lint + tests
 - [ ] **M1 — Data:** Bukva downloaded, `inspect_dataset.py`,
       `extract_landmarks.py` + extraction report, `collect.py`,
       `visualize.py`, small own webcam set
-- [ ] **M2 — Model:** `features.py` with unit tests, `train.py`,
+      (done: download, inspection, extraction; open: collect.py, visualize.py,
+      own webcam set)
+- [x] **M2 — Model:** `features.py` with unit tests, `train.py`,
       `evaluate.py` (signer-independent + confusion matrix), templates, model-v1
-- [ ] **M3 — Backend:** DB + migrations, auth, letters, WebSocket evaluation,
+- [x] **M3 — Backend:** DB + migrations, auth, letters, WebSocket evaluation,
       attempts/progress, integration tests
 - [ ] **M4 — Frontend:** camera, landmarker, overlay with finger highlighting,
       Learn mode end-to-end, browser-landmark validation of the model
+      (done: all but browser-landmark validation, which needs webcam data)
 - [ ] **M5 — Deploy:** OCI + HTTPS + Nginx WS, CD pipeline, monitoring
 - [ ] **M6 — Experiments:** bandwidth, latency, load test, scaling, models
 - [ ] **M7 — Delivery:** README with screenshots/GIF, report, demo video, slides

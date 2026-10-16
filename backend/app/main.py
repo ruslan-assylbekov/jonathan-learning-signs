@@ -20,7 +20,9 @@ from app.infrastructure.auth.dev import DevTokenVerifier
 from app.infrastructure.auth.passwords import hash_password
 from app.infrastructure.auth.tokens import JwtTokens
 from app.infrastructure.db import models
+from app.infrastructure.db.repositories import DbLetterCatalog, DbTemplateSource
 from app.infrastructure.db.session import session_factory
+from app.infrastructure.ml.model import JoblibClassifier
 from app.infrastructure.ml.stub import StubClassifier, StubLetterCatalog, StubTemplates
 from app.presentation.api import auth, letters, progress
 from app.presentation.ws import practice
@@ -40,7 +42,7 @@ def build_app(sessions: async_sessionmaker[AsyncSession] | None = None) -> FastA
     sessions = sessions or session_factory
     app = FastAPI(title="Sign Assistant", lifespan=_lifespan)
 
-    classifier, catalog, templates = _gesture_stack()
+    classifier, catalog, templates = _gesture_stack(sessions)
     _check_feature_version(classifier)
 
     tokens = JwtTokens(
@@ -138,16 +140,19 @@ async def _ensure_dev_user(sessions: async_sessionmaker[AsyncSession]) -> int:
         return int(user.id)
 
 
-def _gesture_stack() -> tuple[GestureClassifier, LetterCatalog, TemplateSource]:
+def _gesture_stack(
+    sessions: async_sessionmaker[AsyncSession],
+) -> tuple[GestureClassifier, LetterCatalog, TemplateSource]:
     """Pick the real stack or the stub, by whether a trained model is present.
 
     Deciding this from the artifact on disk rather than a flag means the app is
     runnable at every point in the project's life, and flips over by itself the
-    moment ``model-v1`` is trained -- with nothing to remember to switch.
+    moment a model is trained -- with nothing to remember to switch.
 
     The stub also brings its own letter catalog, because its classes are demo
     gestures rather than letters: pairing it with the real alphabet would offer
-    33 targets that can never be matched.
+    targets that can never be matched. Likewise the real model gets the real
+    catalog, which offers only the static letters it was trained on.
     """
     if not settings.model_file.exists():
         logger.warning(
@@ -157,10 +162,15 @@ def _gesture_stack() -> tuple[GestureClassifier, LetterCatalog, TemplateSource]:
         )
         return StubClassifier(), StubLetterCatalog(), StubTemplates()
 
-    raise NotImplementedError(
-        f"A model is present at {settings.model_file} but no loader is wired yet "
-        "(CLAUDE.md 19, M2). Implement infrastructure/ml loading before using it."
+    classifier = JoblibClassifier(settings.model_file)
+    logger.info(
+        "Loaded %s: %s, %d classes, feature version %d",
+        settings.model_file.name,
+        classifier.metadata.get("model_type"),
+        len(classifier.classes),
+        classifier.feature_version,
     )
+    return classifier, DbLetterCatalog(sessions), DbTemplateSource(sessions)
 
 
 def _check_feature_version(classifier: GestureClassifier) -> None:

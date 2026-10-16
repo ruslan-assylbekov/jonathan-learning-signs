@@ -14,6 +14,8 @@ dependencies = [
     "alembic>=1.20.0",
     "pyjwt>=2.15.1",
     "bcrypt>=5.0.0",
+    "scikit-learn>=1.5",
+    "joblib>=1.4",
 ]
 
 [dependency-groups]
@@ -54,10 +56,10 @@ select = ["E", "F", "I", "B", "UP"]
 strict = true
 plugins = ["pydantic.mypy"]
 
-# MediaPipe ships no type information, so its surface is untyped by necessity.
-# Everything we build on top of it stays strictly typed.
+# MediaPipe and scikit-learn ship no type information, so their surfaces are
+# untyped by necessity. Everything we build on top of them stays strictly typed.
 [[tool.mypy.overrides]]
-module = ["mediapipe.*"]
+module = ["mediapipe.*", "sklearn.*", "joblib.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
