@@ -414,7 +414,7 @@ def write_report(args: argparse.Namespace, report: ChunkReport) -> None:
         "frames_per_video": args.frames_per_video,
         "min_score": args.min_score,
     }
-    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False))
+    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
 
     kept = sum(report.frames_kept.values())
     dropped = sum(report.frames_no_hand.values()) + sum(report.frames_low_score.values())

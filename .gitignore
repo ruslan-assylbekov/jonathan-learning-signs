@@ -10,7 +10,6 @@ dist/
 *.avi
 ml/data/*.parquet
 
-ml/data/inspection_report.json
 
 # vendored third-party binaries, fetched with `npm run vendor`
 frontend/public/mediapipe/

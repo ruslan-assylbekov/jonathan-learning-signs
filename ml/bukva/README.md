@@ -73,3 +73,24 @@ free commit before suspecting the data.
 
 The run is resumable: finished chunks are left alone, so an interrupted
 attempt only costs the chunks that were in flight.
+
+## Extraction results (2026-10-16)
+
+`ml/data/bukva_landmarks.parquet`, regenerate with `make extract`:
+
+* **27,897 frames from 3,831 of the 3,862 clips**, 155 signers, 34 classes.
+  Nothing was unreadable and nothing failed mid-extraction; the 31 missing
+  clips simply had no hand detected in any of their sampled frames.
+* **16,112 frames were sampled, 1,789 dropped** for no detected hand. Losses
+  concentrate where you would expect: `no_sign` (467), then С, Щ, Ш, Ц.
+* **The official split survives and stays signer-disjoint** — 23,077 train and
+  4,820 test rows, no signer in both.
+* **All of it feeds `features.py` cleanly**: 3,000 sampled rows produced finite
+  78-dimensional vectors with no rejections, coordinates within [-3.3, 2.7]
+  and angles within [0°, 178°].
+
+One thing to weigh before training: **`no_sign` has 373 frames against a median
+of 845 per letter**, because a clip of "no sign" often shows no hand at all and
+those frames are dropped. The frames that remain are the useful ones — a hand
+in view that is not forming a letter — but the class is half the size of the
+others and will need weighting, or more frames sampled from those clips.

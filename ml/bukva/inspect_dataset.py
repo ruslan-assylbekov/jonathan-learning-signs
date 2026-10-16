@@ -93,7 +93,9 @@ def main() -> None:
     report["intervals"] = describe_intervals(frame, report["wanted"])
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(json.dumps(report, indent=2, ensure_ascii=False, default=str))
+    args.out.write_text(
+        json.dumps(report, indent=2, ensure_ascii=False, default=str), encoding="utf-8"
+    )
     section("Next steps")
     print(f"  Report written to {args.out}")
     print("  Decide the static letter subset from the reference, then fill docs/alphabet.md.")
