@@ -2,6 +2,11 @@ services:
   api:
     build: ./backend
     env_file: .env
+    environment:
+      # Inside the network the services answer to their service names, which is
+      # not what the host-side .env says.
+      DATABASE_URL: postgresql+asyncpg://sign:sign@postgres:5432/sign
+      REDIS_URL: redis://redis:6379/0
     ports: ["8000:8000"]
     depends_on: [postgres, redis]
   postgres:

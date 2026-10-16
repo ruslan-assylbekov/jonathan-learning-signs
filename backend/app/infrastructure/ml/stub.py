@@ -105,7 +105,7 @@ class StubTemplates:
     made up: extended means straight, folded means bent.
     """
 
-    def template_for(self, label: str) -> LetterTemplate | None:
+    async def template_for(self, label: str) -> LetterTemplate | None:
         try:
             extended = extended_from_label(label)
         except ValueError:
@@ -126,13 +126,13 @@ class StubLetterCatalog:
     database-backed catalog replaces this.
     """
 
-    def all(self) -> list[Letter]:
+    async def all(self) -> list[Letter]:
         return [
             Letter(id=index, symbol=symbol, sort_order=index)
             for index, symbol in enumerate(STUB_TARGETS)
         ]
 
-    def by_id(self, letter_id: int) -> Letter | None:
+    async def by_id(self, letter_id: int) -> Letter | None:
         if 0 <= letter_id < len(STUB_TARGETS):
             return Letter(id=letter_id, symbol=STUB_TARGETS[letter_id], sort_order=letter_id)
         return None

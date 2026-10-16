@@ -37,18 +37,20 @@ class GestureClassifier(Protocol):
 class TemplateSource(Protocol):
     """Reference poses used to generate hints."""
 
-    def template_for(self, label: str) -> LetterTemplate | None:
+    async def template_for(self, label: str) -> LetterTemplate | None:
         """The template for ``label``, or None when there is none to compare
-        against -- in which case the frame is evaluated without hints."""
+        against -- in which case the frame is evaluated without hints.
+
+        Awaited once when a session starts, never per frame."""
 
 
 @runtime_checkable
 class LetterCatalog(Protocol):
     """The practice targets available, however they are stored."""
 
-    def all(self) -> list[Letter]: ...
+    async def all(self) -> list[Letter]: ...
 
-    def by_id(self, letter_id: int) -> Letter | None:
+    async def by_id(self, letter_id: int) -> Letter | None:
         """The letter with this id, or None -- the caller reports
         ``UNKNOWN_LETTER`` rather than guessing a target."""
 

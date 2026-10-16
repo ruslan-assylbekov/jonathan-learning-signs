@@ -9,6 +9,11 @@ dependencies = [
     "pydantic>=2.8",
     "pydantic-settings>=2.4",
     "numpy>=2.0",
+    "sqlalchemy[asyncio]>=2.0",
+    "asyncpg>=0.32.0",
+    "alembic>=1.20.0",
+    "pyjwt>=2.15.1",
+    "bcrypt>=5.0.0",
 ]
 
 [dependency-groups]
@@ -51,4 +56,9 @@ plugins = ["pydantic.mypy"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+# One event loop for the whole run, as the real application has. With a loop
+# per test, the module-level engine's pooled connections outlive the loop that
+# opened them and the next test dies on "Event loop is closed".
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
 testpaths = ["tests"]

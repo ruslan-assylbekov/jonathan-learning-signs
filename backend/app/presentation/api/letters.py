@@ -19,13 +19,13 @@ async def list_letters(request: Request) -> list[LetterOut]:
     catalog = request.app.state.practice_deps.letters
     return [
         LetterOut(id=letter.id, symbol=letter.symbol, sort_order=letter.sort_order)
-        for letter in catalog.all()
+        for letter in await catalog.all()
     ]
 
 
 @router.get("/letters/{letter_id}")
 async def get_letter(letter_id: int, request: Request) -> LetterOut:
-    letter = request.app.state.practice_deps.letters.by_id(letter_id)
+    letter = await request.app.state.practice_deps.letters.by_id(letter_id)
     if letter is None:
         raise HTTPException(
             status_code=404,

@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.domain.gesture.features import FEATURE_VERSION
-from app.domain.ports import GestureClassifier, TokenVerifier
+from app.domain.ports import GestureClassifier, LetterCatalog, TemplateSource, TokenVerifier
 from app.infrastructure.auth.dev import ClosedTokenVerifier, DevTokenVerifier
 from app.infrastructure.ml.stub import StubClassifier, StubLetterCatalog, StubTemplates
 from app.presentation.api import letters
@@ -22,13 +22,13 @@ logger = logging.getLogger(__name__)
 def build_app() -> FastAPI:
     app = FastAPI(title="Sign Assistant")
 
-    classifier: GestureClassifier = StubClassifier()
+    classifier, catalog, templates = _gesture_stack()
     _check_feature_version(classifier)
 
     app.state.practice_deps = practice.PracticeDeps(
         classifier=classifier,
-        templates=StubTemplates(),
-        letters=StubLetterCatalog(),
+        templates=templates,
+        letters=catalog,
         tokens=_token_verifier(),
         confidence_threshold=settings.confidence_threshold,
         hold_frames=settings.hold_frames,
@@ -54,6 +54,31 @@ def build_app() -> FastAPI:
         }
 
     return app
+
+
+def _gesture_stack() -> tuple[GestureClassifier, LetterCatalog, TemplateSource]:
+    """Pick the real stack or the stub, by whether a trained model is present.
+
+    Deciding this from the artifact on disk rather than a flag means the app is
+    runnable at every point in the project's life, and flips over by itself the
+    moment ``model-v1`` is trained -- with nothing to remember to switch.
+
+    The stub also brings its own letter catalog, because its classes are demo
+    gestures rather than letters: pairing it with the real alphabet would offer
+    33 targets that can never be matched.
+    """
+    if not settings.model_file.exists():
+        logger.warning(
+            "No model at %s: running on StubClassifier with demo targets. "
+            "Nothing it reports is a result about sign language.",
+            settings.model_file,
+        )
+        return StubClassifier(), StubLetterCatalog(), StubTemplates()
+
+    raise NotImplementedError(
+        f"A model is present at {settings.model_file} but no loader is wired yet "
+        "(CLAUDE.md 19, M2). Implement infrastructure/ml loading before using it."
+    )
 
 
 def _check_feature_version(classifier: GestureClassifier) -> None:

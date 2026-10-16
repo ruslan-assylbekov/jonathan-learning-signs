@@ -27,8 +27,10 @@ Requires Python 3.12 (uv manages it) and Node 20+.
 
 ```bash
 cp .env.example .env     # DEV_AUTH=true is already set for local use
+docker compose up -d postgres redis
 
 cd backend && uv sync --group ml
+uv run alembic upgrade head
 uv run uvicorn app.main:app --port 8000
 
 cd ../frontend && npm install
@@ -51,7 +53,8 @@ are not committed.
 ## Checks
 
 ```bash
-cd backend && uv run pytest        # 75 tests
+docker compose up -d postgres redis   # integration tests need it
+cd backend && uv run pytest           # 84 tests
 uv run ruff check . ../ml && uv run mypy app tests ../ml
 cd ../frontend && npm run build    # type-checks, then bundles
 ```

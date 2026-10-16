@@ -27,5 +27,15 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173"
     log_level: str = "INFO"
 
+    @property
+    def model_file(self) -> Path:
+        """``model_path`` resolved against the repository root.
+
+        Its presence is what decides whether the app runs on a real model or on
+        the stub, so it must not depend on the working directory.
+        """
+        path = Path(self.model_path)
+        return path if path.is_absolute() else _ROOT / path
+
 
 settings = Settings()

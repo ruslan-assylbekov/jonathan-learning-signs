@@ -11,9 +11,9 @@ from collections.abc import Sequence
 
 from app.domain.entities import Evaluation
 from app.domain.gesture.features import Handedness, extract_features
-from app.domain.gesture.feedback import hints_for
+from app.domain.gesture.feedback import LetterTemplate, hints_for
 from app.domain.gesture.stabilizer import Stabilizer
-from app.domain.ports import GestureClassifier, TemplateSource
+from app.domain.ports import GestureClassifier
 
 
 class PracticeSession:
@@ -21,6 +21,10 @@ class PracticeSession:
 
     Holds the hold-counter, so it is per-connection state: created on ``start``
     and replaced when the target changes.
+
+    The template is passed in already resolved rather than looked up per frame.
+    At 15 frames a second a lookup per frame would mean a query per frame for a
+    value that cannot change during the session.
     """
 
     def __init__(
@@ -29,13 +33,13 @@ class PracticeSession:
         target: str,
         aspect: float,
         classifier: GestureClassifier,
-        templates: TemplateSource,
+        template: LetterTemplate | None,
         confidence_threshold: float,
         hold_frames: int,
     ) -> None:
         self._aspect = aspect
         self._classifier = classifier
-        self._templates = templates
+        self._template = template
         self._stabilizer = Stabilizer(
             target, confidence_threshold=confidence_threshold, hold_frames=hold_frames
         )
@@ -62,12 +66,11 @@ class PracticeSession:
         hold = self._stabilizer.update(prediction.label, prediction.confidence)
 
         # No hand in frame means nothing to correct, and a correct hold needs no
-        # advice either (CLAUDE.md 6.4, 6.5).
+        # advice either (CLAUDE.md 6.4, 6.5). A letter with no template yet is
+        # practised without hints rather than against invented angles.
         hints = []
-        if not hold.is_no_sign and not hold.correct:
-            template = self._templates.template_for(self.target)
-            if template is not None:
-                hints = hints_for(features, template)
+        if not hold.is_no_sign and not hold.correct and self._template is not None:
+            hints = hints_for(features, self._template)
 
         return Evaluation(
             prediction=prediction,

@@ -104,11 +104,11 @@ async def _converse(websocket: WebSocket, deps: PracticeDeps) -> None:
             continue
 
         if isinstance(message, StartMessage):
-            letter = deps.letters.by_id(message.letter_id)
+            letter = await deps.letters.by_id(message.letter_id)
             if letter is None:
                 await _fail(websocket, "UNKNOWN_LETTER", f"no letter {message.letter_id}")
                 continue
-            session = _new_session(message, letter.symbol, deps)
+            session = await _new_session(message, letter.symbol, deps)
             letter_id = letter.id
             started_at = time.perf_counter()
             continue
@@ -124,12 +124,14 @@ async def _converse(websocket: WebSocket, deps: PracticeDeps) -> None:
         await _handle_frame(websocket, message, session, deps, limiter, letter_id, started_at)
 
 
-def _new_session(message: StartMessage, target: str, deps: PracticeDeps) -> PracticeSession:
+async def _new_session(message: StartMessage, target: str, deps: PracticeDeps) -> PracticeSession:
+    # Resolved here, once, rather than inside the per-frame path.
+    template = await deps.templates.template_for(target)
     return PracticeSession(
         target=target,
         aspect=aspect_of(message.width, message.height),
         classifier=deps.classifier,
-        templates=deps.templates,
+        template=template,
         confidence_threshold=deps.confidence_threshold,
         hold_frames=deps.hold_frames,
     )
