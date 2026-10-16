@@ -32,7 +32,7 @@ eval:
 	uv run --project backend --group ml python ml/evaluate.py
 
 templates:
-	uv run --project backend --group ml python ml/build_templates.py
+	uv run --project backend --group ml python ml/build_templates.py --apply
 
 loadtest:
 	cd experiments/loadtest && uv run locust -H $(LOADTEST_HOST)

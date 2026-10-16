@@ -1,0 +1,64 @@
+{
+  "version": 2,
+  "feature_version": 2,
+  "classes": [
+    "А",
+    "Б",
+    "В",
+    "Г",
+    "Е",
+    "Ж",
+    "И",
+    "К",
+    "Л",
+    "М",
+    "Н",
+    "О",
+    "П",
+    "Р",
+    "С",
+    "Т",
+    "У",
+    "Ф",
+    "Х",
+    "Ч",
+    "Ш",
+    "Ы",
+    "Э",
+    "Ю",
+    "Я"
+  ],
+  "model_type": "logreg",
+  "metrics": {
+    "test": {
+      "accuracy": 0.702,
+      "macro_f1": 0.7061
+    },
+    "cv_signer_grouped": {
+      "model": "logreg",
+      "accuracy_mean": 0.7705,
+      "accuracy_std": 0.0409,
+      "macro_f1_mean": 0.771,
+      "macro_f1_std": 0.0393,
+      "fit_seconds_mean": 2.486
+    },
+    "latency_model_only": {
+      "median_ms": 0.1691,
+      "p95_ms": 0.299,
+      "samples": 500
+    }
+  },
+  "trained_at": "2026-10-16T16:21:48+00:00",
+  "dataset_sha256": "1525b08c343a60f205b8631e78adf72fd2df258fb37e4b26d7906622c481eea7",
+  "participants": {
+    "train_signers": 135,
+    "test_signers": 20,
+    "train_frames": 17565,
+    "test_frames": 3624
+  },
+  "environment": {
+    "python": "3.12.13",
+    "sklearn": "1.9.1",
+    "platform": "Windows-11-10.0.26200-SP0"
+  }
+}

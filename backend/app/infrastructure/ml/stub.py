@@ -115,7 +115,11 @@ class StubTemplates:
             finger: dict.fromkeys(JOINTS, 0.0 if is_extended else FOLDED_REFERENCE_FLEXION)
             for finger, is_extended in zip(FINGERS, extended, strict=True)
         }
-        return LetterTemplate(symbol=label, angles=angles, tolerance_deg=STUB_TOLERANCE_DEG)
+        return LetterTemplate(
+            symbol=label,
+            angles=angles,
+            tolerances=dict.fromkeys(FINGERS, STUB_TOLERANCE_DEG),
+        )
 
 
 class StubLetterCatalog:

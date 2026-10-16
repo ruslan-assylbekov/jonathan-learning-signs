@@ -1,5 +1,7 @@
 """Is no_sign over-predicted because of class weighting, or by nature?
 
+Outcome: no_sign was removed from the model (CLAUDE.md 6.4).
+
 Prompted by model-v1's held-out report, where no_sign scored F1 0.06 and real
 letters lost up to a quarter of their frames to it. Answered here on the
 TRAINING signers only, with the same signer-grouped folds as train.py: the
@@ -43,7 +45,9 @@ def variants() -> dict[str, dict[str, object]]:
 def main() -> None:
     if isinstance(sys.stdout, io.TextIOWrapper):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    train = dataset.load().train
+    # Explicitly include no_sign: ml/labels.json dropped it after this
+    # experiment, and the default class list would quietly leave it out.
+    train = dataset.load(classes=[*dataset.load_classes(), NO_SIGN]).train
     rows = []
 
     for name, options in variants().items():
@@ -75,12 +79,8 @@ def main() -> None:
                         labels=sorted(set(truth[letters])),
                         average="macro",
                     ),
-                    "no_sign_f1": f1_score(
-                        truth == NO_SIGN, predicted == NO_SIGN, zero_division=0
-                    ),
-                    "letter_frames_lost_to_no_sign": float(
-                        (predicted[letters] == NO_SIGN).mean()
-                    ),
+                    "no_sign_f1": f1_score(truth == NO_SIGN, predicted == NO_SIGN, zero_division=0),
+                    "letter_frames_lost_to_no_sign": float((predicted[letters] == NO_SIGN).mean()),
                     "share_predicted_no_sign": float((predicted == NO_SIGN).mean()),
                     "share_truly_no_sign": float((truth == NO_SIGN).mean()),
                 }

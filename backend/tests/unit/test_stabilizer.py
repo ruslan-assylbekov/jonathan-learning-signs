@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.domain.gesture.stabilizer import NO_SIGN, Stabilizer
+from app.domain.gesture.stabilizer import Stabilizer
 
 TARGET = "A"
 
@@ -65,18 +65,19 @@ def test_confidence_exactly_at_the_threshold_counts() -> None:
     assert make(threshold=0.7).update(TARGET, 0.7).correct
 
 
-def test_no_sign_neither_advances_nor_resets() -> None:
+def test_a_pause_on_another_shape_resets_the_hold() -> None:
+    """There is no no_sign class to pause on: whatever the hand does between
+    attempts is a miss, and a hold has to be consecutive."""
     stabilizer = make()
     stabilizer.update(TARGET, 0.9)
     stabilizer.update(TARGET, 0.9)
 
-    absent = stabilizer.update(NO_SIGN, 0.95)
+    paused = stabilizer.update("B", 0.4)
     resumed = stabilizer.update(TARGET, 0.9)
 
-    assert absent.is_no_sign
-    assert not absent.correct
-    assert absent.consecutive_hits == 2, "the user simply paused; keep the progress"
-    assert resumed.succeeded
+    assert paused.consecutive_hits == 0
+    assert not resumed.succeeded
+    assert resumed.consecutive_hits == 1
 
 
 def test_reset_clears_progress_and_can_change_target() -> None:

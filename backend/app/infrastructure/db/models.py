@@ -40,7 +40,8 @@ class User(Base):
 class Letter(Base):
     """A practice target.
 
-    ``template_angles`` and ``is_static`` are nullable because they come from
+    ``template_angles``, ``finger_tolerances`` and ``is_static`` are nullable
+    because they come from
     the dataset, not from this file: templates are produced by
     ``ml/build_templates.py`` and the static subset is decided from the Bukva
     reference (CLAUDE.md 8.1). A letter with no template is practised without
@@ -54,7 +55,7 @@ class Letter(Base):
     alphabet: Mapped[str] = mapped_column(String(16))
     reference_image_url: Mapped[str | None] = mapped_column(String(512))
     template_angles: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
-    tolerance_deg: Mapped[float | None] = mapped_column(Float)
+    finger_tolerances: Mapped[dict[str, float] | None] = mapped_column(JSONB)
     is_static: Mapped[bool | None] = mapped_column(Boolean)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
 

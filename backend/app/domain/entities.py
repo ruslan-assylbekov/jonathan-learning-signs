@@ -38,5 +38,4 @@ class Evaluation:
     correct: bool
     hold_progress: float
     succeeded: bool
-    is_no_sign: bool
     hints: list[Hint] = field(default_factory=list)

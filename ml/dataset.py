@@ -62,16 +62,17 @@ def load_classes() -> list[str]:
     return list(payload["classes"])
 
 
-def load(parquet: Path = DEFAULT_PARQUET) -> Dataset:
+def load(parquet: Path = DEFAULT_PARQUET, classes: list[str] | None = None) -> Dataset:
     """Read the parquet, keep the MVP classes, and compute features.
 
-    Rows of excluded (dynamic) letters are dropped here, once, so no caller
-    can accidentally train on a class the app will never offer.
+    Rows outside ``classes`` (by default ml/labels.json) are dropped here, once,
+    so no caller can accidentally train on a class the app will never offer.
+    Experiments that need a different set pass it explicitly.
     """
     if not parquet.is_file():
         raise SystemExit(f"{parquet} not found. Run `make extract` first.")
 
-    classes = load_classes()
+    classes = classes if classes is not None else load_classes()
     frame = pd.read_parquet(parquet)
     frame = frame[frame["letter"].isin(classes)].reset_index(drop=True)
 

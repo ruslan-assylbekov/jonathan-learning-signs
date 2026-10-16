@@ -7,7 +7,14 @@
 
 import type { DetectedHand } from "./landmarker";
 
-export type HintCode = "SHOULD_BE_STRAIGHT" | "SHOULD_BE_BENT";
+/** Where a finger should end up (backend feedback.py, CLAUDE.md 6.5). */
+export type HintCode =
+  | "STRAIGHTEN"
+  | "BEND_HALFWAY"
+  | "ONLY_HALFWAY"
+  | "BEND_FULLY"
+  | "BEND_MORE"
+  | "BEND_LESS";
 
 export interface Hint {
   readonly finger: string;

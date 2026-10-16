@@ -9,7 +9,7 @@ services:
       REDIS_URL: redis://redis:6379/0
       # The image is built from backend/ only, so the model is mounted in.
       # Without it the app falls back to the stub -- /health says so.
-      MODEL_PATH: /srv/ml/artifacts/model-v1.joblib
+      MODEL_PATH: /srv/ml/artifacts/model-v2.joblib
     volumes:
       - ./ml/artifacts:/srv/ml/artifacts:ro
     ports: ["8000:8000"]

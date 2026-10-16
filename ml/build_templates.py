@@ -4,19 +4,19 @@ Built from the training signers only. Each letter's template is the median of
 its examples' joint angles -- the median rather than the mean because a few
 badly tracked frames would otherwise drag a whole finger's reference off.
 
-Tolerance is derived, not chosen. For every training example of a letter we
-take the largest deviation any of its fingers shows from the template -- the
-quantity that decides whether feedback.hints_for says anything at all -- and
-set the tolerance at the given percentile of it. At the default 80th, about
-four in five genuine examples of the letter earn no hint. The held-out test
-signers then measure how well that carries over to people the templates were
-not built from.
+Tolerance is derived per finger, not chosen. For every training example of a
+letter we take each finger's worst-joint deviation from the template -- the
+quantity feedback.hints_for compares -- and set that finger's tolerance at the
+given percentile of it. Per finger because fingers are not equally noisy: ring
+and little finger vary about twice as much as thumb and index, and a single
+tolerance had to be wide enough for the worst of them. The held-out test
+signers then measure how often genuine examples stay hint-free.
 
 Usage:
-    uv run --group ml python ml/build_templates.py [--percentile 80] [--apply]
+    uv run --group ml python ml/build_templates.py [--percentile 90] [--apply]
 
 Writes ml/artifacts/templates-v{FEATURE_VERSION}.json. With --apply, also
-stores them in letters.template_angles / tolerance_deg in the database.
+stores them in letters.template_angles / finger_tolerances in the database.
 """
 
 from __future__ import annotations
@@ -34,7 +34,6 @@ import numpy.typing as npt
 
 from app.domain.gesture.features import FEATURE_VERSION, FINGERS, JOINTS
 from app.domain.gesture.feedback import LetterTemplate, hints_for
-from app.domain.gesture.stabilizer import NO_SIGN
 
 ARTIFACTS = dataset.ROOT / "ml" / "artifacts"
 TOLERANCE_FLOOR_DEG = 10.0
@@ -45,22 +44,27 @@ def main() -> None:
     if isinstance(sys.stdout, io.TextIOWrapper):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--percentile", type=float, default=80.0)
+    parser.add_argument("--percentile", type=float, default=90.0)
     parser.add_argument("--apply", action="store_true", help="write templates to the database")
     args = parser.parse_args()
 
     print("loading and extracting features ...")
     data = dataset.load()
-    letters = [label for label in data.classes if label != NO_SIGN]
+    letters = list(data.classes)
 
     templates = {letter: build(data.train, letter, args.percentile) for letter in letters}
+    # Calibrate on training signers, report on test ones: the percentile is
+    # picked by looking at train_quiet only, so the test figure stays honest.
+    train_quiet = measure(data.train, templates)
     quiet_rate = measure(data.test, templates)
+    print(f"  training signers' genuine examples earning no hint: {train_quiet['overall']:.1%}")
 
     payload = {
         "feature_version": FEATURE_VERSION,
         "percentile": args.percentile,
         "built_from": "train split only",
         "dataset_sha256": data.sha256,
+        "train_quiet_rate": train_quiet["overall"],
         "test_quiet_rate": quiet_rate,
         "letters": templates,
     }
@@ -77,11 +81,11 @@ def build(split: dataset.Split, letter: str, percentile: float) -> dict[str, Any
     angles = dataset.angle_matrix(split)[mask]  # (n, finger, joint)
     median = np.median(angles, axis=0)
 
-    # Per example: the worst joint of each finger, then the worst finger. That
-    # is exactly the deviation hints_for compares against the tolerance.
-    worst = np.abs(angles - median).max(axis=2).max(axis=1)
-    tolerance = float(
-        np.clip(np.percentile(worst, percentile), TOLERANCE_FLOOR_DEG, TOLERANCE_CEILING_DEG)
+    # Per example and finger: that finger's worst joint -- exactly what
+    # hints_for compares against the finger's tolerance.
+    worst = np.abs(angles - median).max(axis=2)  # (n, finger)
+    tolerances = np.clip(
+        np.percentile(worst, percentile, axis=0), TOLERANCE_FLOOR_DEG, TOLERANCE_CEILING_DEG
     )
 
     return {
@@ -89,7 +93,7 @@ def build(split: dataset.Split, letter: str, percentile: float) -> dict[str, Any
             finger: {joint: round(float(median[f, j]), 2) for j, joint in enumerate(JOINTS)}
             for f, finger in enumerate(FINGERS)
         },
-        "tolerance_deg": round(tolerance, 2),
+        "tolerances": {finger: round(float(tolerances[f]), 2) for f, finger in enumerate(FINGERS)},
         "examples": int(mask.sum()),
     }
 
@@ -106,7 +110,7 @@ def measure(split: dataset.Split, templates: dict[str, dict[str, Any]]) -> dict[
     per_letter: dict[str, float] = {}
     for letter, entry in templates.items():
         template = LetterTemplate(
-            symbol=letter, angles=entry["angles"], tolerance_deg=entry["tolerance_deg"]
+            symbol=letter, angles=entry["angles"], tolerances=entry["tolerances"]
         )
         indices = np.flatnonzero(split.labels == letter)
         quiet = [
@@ -139,7 +143,7 @@ async def apply(templates: dict[str, dict[str, Any]]) -> None:
                     models.Letter.alphabet == DEFAULT_ALPHABET,
                     models.Letter.symbol == letter,
                 )
-                .values(template_angles=entry["angles"], tolerance_deg=entry["tolerance_deg"])
+                .values(template_angles=entry["angles"], finger_tolerances=entry["tolerances"])
                 .returning(models.Letter.id)
             )
             updated += len(result.all())
@@ -151,15 +155,15 @@ async def apply(templates: dict[str, dict[str, Any]]) -> None:
 
 
 def report(templates: dict[str, dict[str, Any]], quiet_rate: dict[str, Any], path: Any) -> None:
-    tolerances = [entry["tolerance_deg"] for entry in templates.values()]
     print(f"\n{len(templates)} templates -> {path}")
-    print(
-        f"  tolerance: min {min(tolerances):.1f}, median {np.median(tolerances):.1f}, "
-        f"max {max(tolerances):.1f} degrees"
-    )
+    print("  median tolerance per finger, degrees:")
+    for finger in FINGERS:
+        values = [entry["tolerances"][finger] for entry in templates.values()]
+        at_ceiling = sum(value >= TOLERANCE_CEILING_DEG for value in values)
+        print(f"    {finger:<7} {np.median(values):5.1f}   ({at_ceiling} letters at the ceiling)")
     print(
         f"  unseen signers' genuine examples earning no hint: {quiet_rate['overall']:.1%} "
-        "(target by construction on training signers: the percentile)"
+        "(each finger alone is quiet at the percentile on training signers; all five at once less)"
     )
     print("  letters where feedback is noisiest on unseen signers:")
     for letter, rate in quiet_rate["worst"]:

@@ -17,16 +17,13 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.domain.gesture.features import FINGERS, JOINTS
 from app.infrastructure.db import models
-from app.infrastructure.db.repositories import (
-    FALLBACK_TOLERANCE_DEG,
-    DbLetterCatalog,
-    DbTemplateSource,
-)
+from app.infrastructure.db.repositories import DbLetterCatalog, DbTemplateSource
 from app.infrastructure.db.session import session_factory
 
 pytestmark = pytest.mark.asyncio
 
 TEMPLATE: dict[str, Any] = {finger: dict.fromkeys(JOINTS, 10.0) for finger in FINGERS}
+TOLERANCES: dict[str, float] = dict.fromkeys(FINGERS, 15.0) | {"ring": 35.0}
 
 
 @pytest.fixture
@@ -97,29 +94,34 @@ async def test_an_unknown_id_is_none_not_an_error(alphabet: str) -> None:
 
 async def test_a_template_is_read_back_whole(alphabet: str) -> None:
     await add_letter(
-        alphabet, symbol="A", is_static=True, template_angles=TEMPLATE, tolerance_deg=15.0
+        alphabet,
+        symbol="A",
+        is_static=True,
+        template_angles=TEMPLATE,
+        finger_tolerances=TOLERANCES,
     )
 
     template = await DbTemplateSource(session_factory, alphabet=alphabet).template_for("A")
 
     assert template is not None
-    assert template.tolerance_deg == 15.0
+    assert template.tolerances == TOLERANCES
     assert template.angles["index"]["pip"] == 10.0
 
 
-async def test_a_template_without_a_tolerance_gets_the_fallback(alphabet: str) -> None:
-    await add_letter(alphabet, symbol="A", is_static=True, template_angles=TEMPLATE)
-
-    template = await DbTemplateSource(session_factory, alphabet=alphabet).template_for("A")
-
-    assert template is not None
-    assert template.tolerance_deg == FALLBACK_TOLERANCE_DEG
-
-
-async def test_a_letter_without_a_template_yields_none(alphabet: str) -> None:
-    """The seeded letters are in this state until build_templates.py runs, and
-    they must be practisable without hints rather than refused."""
-    await add_letter(alphabet, symbol="A", is_static=True, template_angles=None)
+@pytest.mark.parametrize(
+    "columns",
+    [
+        pytest.param({"template_angles": None, "finger_tolerances": None}, id="neither"),
+        pytest.param({"template_angles": TEMPLATE, "finger_tolerances": None}, id="no-tolerances"),
+        pytest.param({"template_angles": None, "finger_tolerances": TOLERANCES}, id="no-angles"),
+    ],
+)
+async def test_a_missing_or_half_applied_template_yields_none(
+    alphabet: str, columns: dict[str, Any]
+) -> None:
+    """Seeded letters are in this state until build_templates.py --apply runs,
+    and must be practised without hints rather than refused."""
+    await add_letter(alphabet, symbol="A", is_static=True, **columns)
 
     assert await DbTemplateSource(session_factory, alphabet=alphabet).template_for("A") is None
 
@@ -131,7 +133,13 @@ async def test_an_unknown_symbol_yields_none(alphabet: str) -> None:
 async def test_a_malformed_template_is_not_silently_ignored(alphabet: str) -> None:
     """A seeding bug must surface, not quietly disable hints for that letter."""
     incomplete = {finger: dict.fromkeys(JOINTS, 10.0) for finger in FINGERS if finger != "pinky"}
-    await add_letter(alphabet, symbol="A", is_static=True, template_angles=incomplete)
+    await add_letter(
+        alphabet,
+        symbol="A",
+        is_static=True,
+        template_angles=incomplete,
+        finger_tolerances=TOLERANCES,
+    )
 
     with pytest.raises(ValueError, match="pinky"):
         await DbTemplateSource(session_factory, alphabet=alphabet).template_for("A")

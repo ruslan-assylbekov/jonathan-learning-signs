@@ -11,9 +11,6 @@ from app.infrastructure.db import models
 
 DEFAULT_ALPHABET = "rsl"
 
-#: Used when a letter has a template but no tolerance recorded yet.
-FALLBACK_TOLERANCE_DEG = 20.0
-
 
 class DbLetterCatalog:
     """Implements ``LetterCatalog`` over the ``letters`` table.
@@ -69,7 +66,9 @@ class DbTemplateSource:
         async with self._sessions() as session:
             row = (await session.execute(query)).scalar_one_or_none()
 
-        if row is None or not row.template_angles:
+        # Angles and tolerances are built together by build_templates.py; one
+        # without the other is a half-applied template, treated as none.
+        if row is None or not row.template_angles or not row.finger_tolerances:
             return None
 
         # A malformed template is a seeding bug: LetterTemplate raises, and the
@@ -77,7 +76,7 @@ class DbTemplateSource:
         return LetterTemplate(
             symbol=row.symbol,
             angles=row.template_angles,
-            tolerance_deg=row.tolerance_deg or FALLBACK_TOLERANCE_DEG,
+            tolerances=row.finger_tolerances,
         )
 
 

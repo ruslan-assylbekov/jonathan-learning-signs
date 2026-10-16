@@ -65,11 +65,11 @@ class PracticeSession:
         prediction = self._classifier.predict(features)
         hold = self._stabilizer.update(prediction.label, prediction.confidence)
 
-        # No hand in frame means nothing to correct, and a correct hold needs no
-        # advice either (CLAUDE.md 6.4, 6.5). A letter with no template yet is
-        # practised without hints rather than against invented angles.
+        # A correct hold needs no advice (CLAUDE.md 6.5), and a letter with no
+        # template yet is practised without hints rather than against invented
+        # angles.
         hints = []
-        if not hold.is_no_sign and not hold.correct and self._template is not None:
+        if not hold.correct and self._template is not None:
             hints = hints_for(features, self._template)
 
         return Evaluation(
@@ -77,6 +77,5 @@ class PracticeSession:
             correct=hold.correct,
             hold_progress=hold.hold_progress,
             succeeded=hold.succeeded,
-            is_no_sign=hold.is_no_sign,
             hints=hints,
         )

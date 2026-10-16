@@ -1,9 +1,41 @@
 {
-  "comment": "Class index <-> label for the MVP classifier. Static letters only, from docs/alphabet.md, plus no_sign. Dynamic letters are excluded because a single frame cannot distinguish them.",
+  "comment": "Class index <-> label for the classifier: the static letters of docs/alphabet.md. Dynamic letters are excluded because a single frame cannot distinguish them. There is no no_sign class: model-v1 had one and it failed (F1 0.06 on unseen signers), see experiments/models/no_sign_weighting.py; a hand that is not forming the target is a miss for the stabilizer instead.",
   "classes": [
-    "А", "Б", "В", "Г", "Е", "Ж", "И", "К", "Л", "М", "Н", "О", "П",
-    "Р", "С", "Т", "У", "Ф", "Х", "Ч", "Ш", "Ы", "Э", "Ю", "Я",
-    "no_sign"
+    "А",
+    "Б",
+    "В",
+    "Г",
+    "Е",
+    "Ж",
+    "И",
+    "К",
+    "Л",
+    "М",
+    "Н",
+    "О",
+    "П",
+    "Р",
+    "С",
+    "Т",
+    "У",
+    "Ф",
+    "Х",
+    "Ч",
+    "Ш",
+    "Ы",
+    "Э",
+    "Ю",
+    "Я"
   ],
-  "excluded_dynamic": ["Д", "Ё", "З", "Й", "Ц", "Щ", "Ъ", "Ь"]
+  "excluded_dynamic": [
+    "Д",
+    "Ё",
+    "З",
+    "Й",
+    "Ц",
+    "Щ",
+    "Ъ",
+    "Ь"
+  ],
+  "excluded_no_sign": "Bukva's no_event clips are extracted (letter = no_sign) but not trained on."
 }

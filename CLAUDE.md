@@ -39,7 +39,7 @@ Do not start a lower tier until the tier above works end-to-end.
 
 **Tier 1 — MVP (must have)**
 1. Static RSL letters only (motion-based letters excluded, see §8.1)
-   plus a `no_sign` class.
+   (no `no_sign` class, see §6.4).
 2. Landmark dataset built from Bukva + trained classifier with honest,
    signer-independent evaluation.
 3. Backend: auth, letters, WebSocket evaluation, attempts, progress.
@@ -147,7 +147,7 @@ sign-assistant/
 │   ├── train.py
 │   ├── evaluate.py               # signer-independent evaluation
 │   ├── build_templates.py        # reference finger angles per letter
-│   ├── labels.json               # class index ↔ Cyrillic letter, incl. no_sign
+│   ├── labels.json               # class index ↔ Cyrillic letter (static letters)
 │   ├── data/                     # derived landmark files only (see §8)
 │   └── artifacts/                # model-vN.joblib + model-vN.json
 ├── experiments/
@@ -227,20 +227,34 @@ carries `width`/`height`; the browser reads `videoWidth`/`videoHeight`.
 - Classifier: scikit-learn (kNN / Random Forest / small MLP; final choice
   recorded in `experiments/models/`).
 - Target inference time: < 5 ms per frame on the VM. Measure it.
-- The model includes a `no_sign` class. If the top prediction is
-  `no_sign`, the server sends no hints and does not advance the hold counter.
+- **There is no `no_sign` class** (decided 2026-10-17, replacing the original
+  requirement). model-v1 had one: F1 0.06 on unseen signers, and it swallowed
+  real letters — 13.4% of letter frames. Across class weightings, checked on
+  training signers only (`experiments/models/no_sign_weighting.py`), its F1
+  stayed near 0.15: a hand at rest looks like half the alphabet in one frame.
+  Without it the confidence threshold does the rejecting — wrong frames
+  accepted as a letter stayed at 2.6% (2.5% with no_sign) while clip accuracy
+  rose from 0.774 to 0.818. A hand not forming the target is just a miss.
 - A letter counts as shown correctly only if predicted as the target with
   `confidence ≥ CONFIDENCE_THRESHOLD` for `HOLD_FRAMES` consecutive frames
   (defaults 0.7 and 10, configurable via env). Any miss resets the counter.
 - `hold_progress = consecutive_hits / HOLD_FRAMES` is sent to the client.
 
 ### 6.5 Feedback engine
-- Each letter has `template_angles` (mean joint angles from the dataset,
-  built by `ml/build_templates.py`) and a tolerance in degrees.
-- For each finger, compare the user's angles with the template; if the
-  deviation exceeds tolerance, emit a hint code, e.g.
-  `{"finger": "index", "code": "SHOULD_BE_STRAIGHT"}`.
-- Send at most **2 hints** per frame, ordered by largest deviation.
+- Each letter has `template_angles` (median joint angles of its training
+  examples, built by `ml/build_templates.py`) and `finger_tolerances`, one per
+  finger, each the 90th percentile of that finger's worst-joint deviation on
+  training signers. Per finger because ring and little finger vary about twice
+  as much as thumb and index; a single tolerance had to suit the noisiest.
+- For each finger, compare its worst joint with the template; beyond that
+  finger's tolerance, emit a hint naming where the finger should end up:
+  `STRAIGHTEN`, `BEND_HALFWAY`, `ONLY_HALFWAY`, `BEND_FULLY`, or for the thumb
+  `BEND_MORE` / `BEND_LESS` (direction only). States come from the template's
+  total flexion: half bent from 55°, fully bent from 130° — boundaries read off
+  gaps in the data, see `feedback.py`. The thumb's values form one band with no
+  gaps, so it gets no named states.
+- Send at most **2 hints** per frame, ordered by how many tolerances out the
+  finger is (not raw degrees, which would favour the noisy fingers).
 - The server sends hint **codes**; human-readable text lives in
   `frontend/src/i18n.ts`.
 
@@ -265,7 +279,7 @@ in the same commit, plus integration tests.
 ```json
 {"type": "eval", "seq": 123, "pred": "А", "confidence": 0.92,
  "correct": true, "hold_progress": 0.6,
- "hints": [{"finger": "index", "code": "SHOULD_BE_STRAIGHT"}],
+ "hints": [{"finger": "index", "code": "BEND_HALFWAY"}],
  "server_ms": 2.1}
 {"type": "success", "letter_id": 5, "time_to_success_ms": 3400}
 {"type": "error", "code": "INVALID_FRAME", "detail": "..."}
@@ -331,7 +345,7 @@ Rules:
 - Sample up to K evenly spaced frames per video (configurable, default 8),
   so near-duplicate frames from one clip don't dominate.
 - Drop frames with no detected hand or a low score; log drop counts per letter.
-- Keep "no sign" frames as the `no_sign` class.
+- Keep "no sign" frames in the parquet as `no_sign` (extracted, not trained on; see §6.4).
 - Output: `ml/data/bukva_landmarks.parquet` with
   `video_id, signer_id, letter, frame_idx, handedness, x0, y0, z0, … x20, y20, z20`,
   plus `extraction_report.json` (videos processed, frames kept/dropped per class).
@@ -367,7 +381,7 @@ Rules:
 ```
 users      (id, email UNIQUE, password_hash, created_at)
 letters    (id, symbol, alphabet, reference_image_url, template_angles JSONB,
-            tolerance_deg, is_static, sort_order)
+            finger_tolerances JSONB, is_static, sort_order)
 attempts   (id, user_id FK, letter_id FK, mode, success, time_to_success_ms,
             avg_confidence, frames_count, created_at)
 progress   (user_id FK, letter_id FK, attempts_count, success_rate,
@@ -426,7 +440,7 @@ make revision m="msg"   # new alembic migration
 make extract      # ml/bukva/extract_landmarks.py → ml/data/bukva_landmarks.parquet
 make train        # ml/train.py → ml/artifacts/model-vN.*
 make eval         # ml/evaluate.py, signer-independent splits
-make templates    # ml/build_templates.py → seeds letters.template_angles
+make templates    # ml/build_templates.py --apply → letters.template_angles + finger_tolerances
 make loadtest     # locust against the target in LOADTEST_HOST
 ```
 

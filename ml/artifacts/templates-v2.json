@@ -1,58 +1,59 @@
 {
   "feature_version": 2,
-  "percentile": 80.0,
+  "percentile": 90.0,
   "built_from": "train split only",
   "dataset_sha256": "1525b08c343a60f205b8631e78adf72fd2df258fb37e4b26d7906622c481eea7",
+  "train_quiet_rate": 0.6946,
   "test_quiet_rate": {
-    "overall": 0.7036,
+    "overall": 0.6302,
     "worst": [
       [
-        "П",
-        0.4414
+        "Л",
+        0.3916
       ],
       [
         "Г",
-        0.4474
+        0.4342
       ],
       [
-        "Л",
-        0.4895
+        "П",
+        0.4345
       ],
       [
-        "Е",
-        0.5918
+        "М",
+        0.5822
       ],
       [
-        "У",
-        0.6382
+        "Ч",
+        0.5874
       ]
     ],
     "per_letter": {
-      "А": 0.7376,
-      "Б": 0.75,
-      "В": 0.702,
-      "Г": 0.4474,
-      "Е": 0.5918,
-      "Ж": 0.6906,
-      "И": 0.7724,
-      "К": 0.7762,
-      "Л": 0.4895,
-      "М": 0.726,
-      "Н": 0.6667,
-      "О": 0.8389,
-      "П": 0.4414,
-      "Р": 0.7222,
-      "С": 0.8069,
-      "Т": 0.7959,
-      "У": 0.6382,
-      "Ф": 0.7744,
-      "Х": 0.6597,
-      "Ч": 0.6923,
-      "Ш": 0.875,
-      "Ы": 0.7124,
-      "Э": 0.7857,
-      "Ю": 0.7746,
-      "Я": 0.7211
+      "А": 0.7092,
+      "Б": 0.6667,
+      "В": 0.7086,
+      "Г": 0.4342,
+      "Е": 0.619,
+      "Ж": 0.6547,
+      "И": 0.6828,
+      "К": 0.6224,
+      "Л": 0.3916,
+      "М": 0.5822,
+      "Н": 0.6405,
+      "О": 0.6711,
+      "П": 0.4345,
+      "Р": 0.6736,
+      "С": 0.6759,
+      "Т": 0.6531,
+      "У": 0.6184,
+      "Ф": 0.7293,
+      "Х": 0.6389,
+      "Ч": 0.5874,
+      "Ш": 0.7132,
+      "Ы": 0.5882,
+      "Э": 0.7143,
+      "Ю": 0.7465,
+      "Я": 0.5986
     }
   },
   "letters": {
@@ -84,7 +85,13 @@
           "dip": 42.51
         }
       },
-      "tolerance_deg": 59.08,
+      "tolerances": {
+        "thumb": 35.09,
+        "index": 60.0,
+        "middle": 60.0,
+        "ring": 60.0,
+        "pinky": 60.0
+      },
       "examples": 729
     },
     "Б": {
@@ -115,7 +122,13 @@
           "dip": 40.75
         }
       },
-      "tolerance_deg": 49.5,
+      "tolerances": {
+        "thumb": 34.44,
+        "index": 29.8,
+        "middle": 44.04,
+        "ring": 58.26,
+        "pinky": 51.49
+      },
       "examples": 666
     },
     "В": {
@@ -146,7 +159,13 @@
           "dip": 4.73
         }
       },
-      "tolerance_deg": 14.94,
+      "tolerances": {
+        "thumb": 15.74,
+        "index": 11.17,
+        "middle": 13.31,
+        "ring": 16.61,
+        "pinky": 13.53
+      },
       "examples": 698
     },
     "Г": {
@@ -177,7 +196,13 @@
           "dip": 18.68
         }
       },
-      "tolerance_deg": 60.0,
+      "tolerances": {
+        "thumb": 18.7,
+        "index": 36.38,
+        "middle": 60.0,
+        "ring": 60.0,
+        "pinky": 60.0
+      },
       "examples": 681
     },
     "Е": {
@@ -208,7 +233,13 @@
           "dip": 19.06
         }
       },
-      "tolerance_deg": 31.74,
+      "tolerances": {
+        "thumb": 18.7,
+        "index": 37.06,
+        "middle": 39.75,
+        "ring": 34.87,
+        "pinky": 30.37
+      },
       "examples": 724
     },
     "Ж": {
@@ -239,7 +270,13 @@
           "dip": 5.36
         }
       },
-      "tolerance_deg": 40.02,
+      "tolerances": {
+        "thumb": 20.67,
+        "index": 42.65,
+        "middle": 46.37,
+        "ring": 45.24,
+        "pinky": 39.65
+      },
       "examples": 717
     },
     "И": {
@@ -270,7 +307,13 @@
           "dip": 6.99
         }
       },
-      "tolerance_deg": 37.6,
+      "tolerances": {
+        "thumb": 19.51,
+        "index": 43.05,
+        "middle": 44.1,
+        "ring": 26.43,
+        "pinky": 18.18
+      },
       "examples": 717
     },
     "К": {
@@ -301,7 +344,13 @@
           "dip": 22.1
         }
       },
-      "tolerance_deg": 60.0,
+      "tolerances": {
+        "thumb": 47.93,
+        "index": 33.56,
+        "middle": 60.0,
+        "ring": 60.0,
+        "pinky": 53.5
+      },
       "examples": 638
     },
     "Л": {
@@ -332,7 +381,13 @@
           "dip": 29.08
         }
       },
-      "tolerance_deg": 60.0,
+      "tolerances": {
+        "thumb": 25.66,
+        "index": 35.94,
+        "middle": 52.61,
+        "ring": 60.0,
+        "pinky": 60.0
+      },
       "examples": 709
     },
     "М": {
@@ -363,7 +418,13 @@
           "dip": 14.22
         }
       },
-      "tolerance_deg": 60.0,
+      "tolerances": {
+        "thumb": 24.09,
+        "index": 29.56,
+        "middle": 42.04,
+        "ring": 50.64,
+        "pinky": 60.0
+      },
       "examples": 619
     },
     "Н": {
@@ -394,7 +455,13 @@
           "dip": 8.75
         }
       },
-      "tolerance_deg": 60.0,
+      "tolerances": {
+        "thumb": 32.98,
+        "index": 23.7,
+        "middle": 34.26,
+        "ring": 60.0,
+        "pinky": 25.19
+      },
       "examples": 740
     },
     "О": {
@@ -425,7 +492,13 @@
           "dip": 7.59
         }
       },
-      "tolerance_deg": 32.71,
+      "tolerances": {
+        "thumb": 23.77,
+        "index": 35.04,
+        "middle": 27.74,
+        "ring": 25.27,
+        "pinky": 17.39
+      },
       "examples": 743
     },
     "П": {
@@ -456,7 +529,13 @@
           "dip": 27.92
         }
       },
-      "tolerance_deg": 60.0,
+      "tolerances": {
+        "thumb": 27.71,
+        "index": 43.03,
+        "middle": 58.62,
+        "ring": 60.0,
+        "pinky": 60.0
+      },
       "examples": 702
     },
     "Р": {
@@ -487,7 +566,13 @@
           "dip": 6.79
         }
       },
-      "tolerance_deg": 60.0,
+      "tolerances": {
+        "thumb": 31.6,
+        "index": 46.35,
+        "middle": 60.0,
+        "ring": 54.01,
+        "pinky": 26.41
+      },
       "examples": 712
     },
     "С": {
@@ -518,7 +603,13 @@
           "dip": 17.92
         }
       },
-      "tolerance_deg": 27.09,
+      "tolerances": {
+        "thumb": 15.81,
+        "index": 25.94,
+        "middle": 30.81,
+        "ring": 32.25,
+        "pinky": 26.16
+      },
       "examples": 738
     },
     "Т": {
@@ -549,7 +640,13 @@
           "dip": 8.46
         }
       },
-      "tolerance_deg": 55.69,
+      "tolerances": {
+        "thumb": 21.58,
+        "index": 40.07,
+        "middle": 49.34,
+        "ring": 60.0,
+        "pinky": 60.0
+      },
       "examples": 681
     },
     "У": {
@@ -580,7 +677,13 @@
           "dip": 10.53
         }
       },
-      "tolerance_deg": 60.0,
+      "tolerances": {
+        "thumb": 19.56,
+        "index": 60.0,
+        "middle": 60.0,
+        "ring": 60.0,
+        "pinky": 60.0
+      },
       "examples": 705
     },
     "Ф": {
@@ -611,7 +714,13 @@
           "dip": 6.0
         }
       },
-      "tolerance_deg": 40.86,
+      "tolerances": {
+        "thumb": 18.2,
+        "index": 49.1,
+        "middle": 58.02,
+        "ring": 53.98,
+        "pinky": 45.06
+      },
       "examples": 709
     },
     "Х": {
@@ -642,7 +751,13 @@
           "dip": 57.87
         }
       },
-      "tolerance_deg": 47.82,
+      "tolerances": {
+        "thumb": 35.38,
+        "index": 34.63,
+        "middle": 54.01,
+        "ring": 56.23,
+        "pinky": 53.03
+      },
       "examples": 744
     },
     "Ч": {
@@ -673,7 +788,13 @@
           "dip": 32.04
         }
       },
-      "tolerance_deg": 57.23,
+      "tolerances": {
+        "thumb": 15.71,
+        "index": 38.11,
+        "middle": 55.94,
+        "ring": 60.0,
+        "pinky": 57.63
+      },
       "examples": 647
     },
     "Ш": {
@@ -704,7 +825,13 @@
           "dip": 31.82
         }
       },
-      "tolerance_deg": 60.0,
+      "tolerances": {
+        "thumb": 17.49,
+        "index": 23.48,
+        "middle": 31.27,
+        "ring": 38.38,
+        "pinky": 60.0
+      },
       "examples": 719
     },
     "Ы": {
@@ -735,7 +862,13 @@
           "dip": 9.84
         }
       },
-      "tolerance_deg": 60.0,
+      "tolerances": {
+        "thumb": 29.69,
+        "index": 24.45,
+        "middle": 60.0,
+        "ring": 60.0,
+        "pinky": 38.99
+      },
       "examples": 770
     },
     "Э": {
@@ -766,7 +899,13 @@
           "dip": 58.77
         }
       },
-      "tolerance_deg": 53.66,
+      "tolerances": {
+        "thumb": 16.34,
+        "index": 28.0,
+        "middle": 55.96,
+        "ring": 60.0,
+        "pinky": 60.0
+      },
       "examples": 656
     },
     "Ю": {
@@ -797,7 +936,13 @@
           "dip": 5.18
         }
       },
-      "tolerance_deg": 35.6,
+      "tolerances": {
+        "thumb": 16.77,
+        "index": 35.86,
+        "middle": 36.36,
+        "ring": 36.73,
+        "pinky": 27.24
+      },
       "examples": 713
     },
     "Я": {
@@ -828,7 +973,13 @@
           "dip": 20.52
         }
       },
-      "tolerance_deg": 60.0,
+      "tolerances": {
+        "thumb": 30.53,
+        "index": 20.08,
+        "middle": 31.8,
+        "ring": 60.0,
+        "pinky": 60.0
+      },
       "examples": 688
     }
   }

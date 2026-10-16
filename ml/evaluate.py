@@ -29,7 +29,6 @@ from sklearn.metrics import accuracy_score, classification_report, confusion_mat
 
 from app.config import settings
 from app.domain.gesture.features import FEATURE_VERSION
-from app.domain.gesture.stabilizer import NO_SIGN
 
 ARTIFACTS = dataset.ROOT / "ml" / "artifacts"
 EXPERIMENTS = dataset.ROOT / "experiments" / "models"
@@ -142,17 +141,16 @@ def threshold_behaviour(
 
     A frame counts toward holding a letter only when it is predicted right *and*
     above the threshold, so a correct prediction below it is a frame the learner
-    earned and did not get. A wrong prediction above it is the worse failure:
-    with no_sign excluded, that is a letter the app would accept as shown.
+    earned and did not get. A wrong prediction above it is the worse failure: a
+    letter the app would accept as shown.
     """
-    is_letter = truth != NO_SIGN
-    wrong_and_confident = (~correct) & (confidence >= threshold) & (predicted != NO_SIGN)
+    wrong_and_confident = (~correct) & (confidence >= threshold)
     return {
         "value": threshold,
         "correct_frames_passing": round(float((confidence[correct] >= threshold).mean()), 4),
         "wrong_frames_passing_as_a_letter": round(float(wrong_and_confident.mean()), 4),
         "letter_frames_usable_for_hold": round(
-            float((correct & (confidence >= threshold))[is_letter].mean()), 4
+            float((correct & (confidence >= threshold)).mean()), 4
         ),
     }
 

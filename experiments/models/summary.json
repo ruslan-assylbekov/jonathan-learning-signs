@@ -2,45 +2,45 @@
   "ranking": [
     {
       "model": "logreg",
-      "accuracy_mean": 0.7609,
-      "accuracy_std": 0.0212,
-      "macro_f1_mean": 0.7588,
-      "macro_f1_std": 0.0126,
-      "fit_seconds_mean": 13.87
+      "accuracy_mean": 0.7705,
+      "accuracy_std": 0.0409,
+      "macro_f1_mean": 0.771,
+      "macro_f1_std": 0.0393,
+      "fit_seconds_mean": 2.486
     },
     {
       "model": "mlp",
-      "accuracy_mean": 0.7544,
-      "accuracy_std": 0.0293,
-      "macro_f1_mean": 0.7469,
-      "macro_f1_std": 0.02,
-      "fit_seconds_mean": 22.828
+      "accuracy_mean": 0.7625,
+      "accuracy_std": 0.0438,
+      "macro_f1_mean": 0.7629,
+      "macro_f1_std": 0.0441,
+      "fit_seconds_mean": 13.916
     },
     {
       "model": "random_forest",
-      "accuracy_mean": 0.7435,
-      "accuracy_std": 0.024,
-      "macro_f1_mean": 0.7424,
-      "macro_f1_std": 0.0169,
-      "fit_seconds_mean": 7.174
+      "accuracy_mean": 0.7533,
+      "accuracy_std": 0.0454,
+      "macro_f1_mean": 0.7553,
+      "macro_f1_std": 0.0436,
+      "fit_seconds_mean": 2.854
     },
     {
       "model": "knn",
-      "accuracy_mean": 0.7027,
-      "accuracy_std": 0.0278,
-      "macro_f1_mean": 0.6894,
-      "macro_f1_std": 0.0195,
-      "fit_seconds_mean": 0.06
+      "accuracy_mean": 0.7131,
+      "accuracy_std": 0.0437,
+      "macro_f1_mean": 0.7119,
+      "macro_f1_std": 0.0405,
+      "fit_seconds_mean": 0.034
     }
   ],
   "chosen": "logreg",
   "test": {
-    "accuracy": 0.6824580400649702,
-    "macro_f1": 0.7087340493242826
+    "accuracy": 0.7019867549668874,
+    "macro_f1": 0.7061343335378598
   },
   "latency_model_only": {
-    "median_ms": 0.1848,
-    "p95_ms": 0.5079,
+    "median_ms": 0.1691,
+    "p95_ms": 0.299,
     "samples": 500
   }
 }

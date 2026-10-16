@@ -17,9 +17,19 @@ const FINGERS: Record<string, string> = {
   pinky: "little finger",
 };
 
+/**
+ * Each code names where the finger should end up, not just a direction:
+ * "bend your index finger" is ambiguous when the letter wants it half bent.
+ * The thumb only ever gets BEND_MORE / BEND_LESS, because its states cannot be
+ * told apart from the angles the backend measures.
+ */
 const HINTS: Record<HintCode, (finger: string) => string> = {
-  SHOULD_BE_STRAIGHT: (finger) => `Straighten your ${finger}`,
-  SHOULD_BE_BENT: (finger) => `Bend your ${finger}`,
+  STRAIGHTEN: (finger) => `Straighten your ${finger}`,
+  BEND_HALFWAY: (finger) => `Bend your ${finger} halfway`,
+  ONLY_HALFWAY: (finger) => `Bend your ${finger} only halfway`,
+  BEND_FULLY: (finger) => `Bend your ${finger} all the way`,
+  BEND_MORE: (finger) => `Bend your ${finger} more`,
+  BEND_LESS: (finger) => `Bend your ${finger} less`,
 };
 
 export function hintText(finger: string, code: HintCode): string {

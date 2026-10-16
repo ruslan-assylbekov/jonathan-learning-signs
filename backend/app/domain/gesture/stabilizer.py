@@ -3,15 +3,17 @@
 CLAUDE.md 6.4. A letter is shown correctly only if it is predicted as the
 target with confidence at or above the threshold for ``hold_frames``
 consecutive frames. Any miss resets the counter.
+
+There is no "no sign" class. A frame-level no_sign class was tried in
+model-v1 and failed -- F1 0.06 on unseen signers, and it swallowed real
+letters -- because a hand at rest looks like half the alphabet in a single
+frame. A hand that is not forming the target is simply a miss: wrong letter or
+low confidence, either way the counter resets.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Final
-
-NO_SIGN: Final = "no_sign"
-"""Class name for "no hand sign present". Never advances the hold counter."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,7 +28,6 @@ class HoldState:
     consecutive_hits: int
     hold_progress: float
     succeeded: bool
-    is_no_sign: bool
 
 
 class Stabilizer:
@@ -60,35 +61,21 @@ class Stabilizer:
         self._succeeded = False
 
     def update(self, prediction: str, confidence: float) -> HoldState:
-        """Feed one classified frame and report the resulting hold state.
-
-        A ``no_sign`` prediction neither advances nor resets the counter: the
-        user is simply not showing anything yet.
-        """
-        if prediction == NO_SIGN:
-            return self._state(correct=False, is_no_sign=True)
-
+        """Feed one classified frame and report the resulting hold state."""
         if prediction == self._target and confidence >= self._threshold:
             if not self._succeeded:
                 self._hits += 1
                 self._succeeded = self._hits >= self._hold_frames
-                return self._state(correct=True, is_no_sign=False, just_succeeded=self._succeeded)
-            return self._state(correct=True, is_no_sign=False)
+                return self._state(correct=True, just_succeeded=self._succeeded)
+            return self._state(correct=True)
 
         self._hits = 0
-        return self._state(correct=False, is_no_sign=False)
+        return self._state(correct=False)
 
-    def _state(
-        self,
-        *,
-        correct: bool,
-        is_no_sign: bool,
-        just_succeeded: bool = False,
-    ) -> HoldState:
+    def _state(self, *, correct: bool, just_succeeded: bool = False) -> HoldState:
         return HoldState(
             correct=correct,
             consecutive_hits=self._hits,
             hold_progress=min(1.0, self._hits / self._hold_frames),
             succeeded=just_succeeded,
-            is_no_sign=is_no_sign,
         )

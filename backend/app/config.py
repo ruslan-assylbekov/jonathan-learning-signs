@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     jwt_secret: str = "change-me"
     jwt_ttl_min: int = 60
-    model_path: str = "ml/artifacts/model-v1.joblib"
+    model_path: str = "ml/artifacts/model-v2.joblib"
     confidence_threshold: float = 0.7
     hold_frames: int = 10
     max_fps_per_conn: int = 30

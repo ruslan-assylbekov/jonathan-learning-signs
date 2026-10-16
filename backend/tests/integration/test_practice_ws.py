@@ -204,7 +204,12 @@ def test_a_wrong_hand_earns_hints(socket: WebSocketTestSession) -> None:
     answer = socket.receive_json()
     assert answer["correct"] is False
     assert answer["hints"], "a closed hand against an open-hand target should be advised"
-    assert all(hint["code"] == "SHOULD_BE_STRAIGHT" for hint in answer["hints"])
+    # The stub's open-hand target wants every finger straight: fingers are told
+    # to straighten, and the thumb, which has no named states, to bend less.
+    expected = {"thumb": "BEND_LESS"}
+    assert all(
+        hint["code"] == expected.get(hint["finger"], "STRAIGHTEN") for hint in answer["hints"]
+    )
     assert len(answer["hints"]) <= 2
 
 
