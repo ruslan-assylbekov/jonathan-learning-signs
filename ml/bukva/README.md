@@ -54,3 +54,22 @@ Run `make inspect` to regenerate. Findings from the real archive (2026-10-16),
   dimensions from the file it opens. Without the aspect correction
   (CLAUDE.md 6.2, step 4) features from this data would not transfer to a
   webcam at all.
+
+## Running the extraction
+
+`make extract`, or the script directly with `--bukva-dir`.
+
+It is bounded by memory, not by cores. Each worker reserves roughly 1 GB of
+Windows commit charge for its MediaPipe graph, against a resident set of about
+370 MB, so what runs out first is commit (RAM plus page file) — on a 16 GB
+machine with a browser and an editor open, two workers fit and four do not.
+
+Exhaustion does not announce itself. OpenCV says "Insufficient memory", but
+MediaPipe fails in two other disguises depending on where the allocation
+lands: a `RET_CHECK` about `AllocateTensors` when a worker starts, or
+`access violation writing 0x20` inside `mp.Image`, which is a null from a
+failed allocation being dereferenced. All three are the same problem. Check
+free commit before suspecting the data.
+
+The run is resumable: finished chunks are left alone, so an interrupted
+attempt only costs the chunks that were in flight.

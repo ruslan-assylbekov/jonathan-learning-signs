@@ -42,15 +42,23 @@ NUM_LANDMARKS = 21
 DEFAULT_FRAMES_PER_VIDEO = 8
 DEFAULT_CHUNK = 60
 
-DEFAULT_WORKERS = 4
-"""Deliberately not the CPU count.
+DEFAULT_WORKERS = 2
+"""Deliberately not the CPU count: this is bounded by memory, not by cores.
 
-Each worker holds its own MediaPipe graph, and TFLite refuses to allocate its
-tensors once memory runs short -- which it reports as an unreadable RET_CHECK
-failure rather than an out-of-memory error. On a 16 GB machine also running
-Docker and a dev server, four workers fit and ten do not. Raise it with
-``--workers`` on a roomier machine; the run is resumable, so a failed attempt
-costs only the chunks that were in flight.
+Each worker reserves about 1 GB of commit for its MediaPipe graph while its
+resident set stays near 370 MB, so the limit that binds is Windows' commit
+charge (RAM plus page file), not free RAM. On a 16 GB machine with a browser
+and an editor open, two workers fit and four do not.
+
+Running out is not reported as running out. OpenCV says "Insufficient memory",
+but MediaPipe fails in three different disguises depending on where the
+allocation lands: a RET_CHECK about AllocateTensors at worker startup, or an
+"access violation writing 0x20" inside mp.Image -- a null from a failed
+allocation, dereferenced. All three mean the same thing. Measure free commit
+before blaming the data.
+
+Raise it with ``--workers`` on a roomier machine. The run is resumable, so a
+failed attempt only costs the chunks that were in flight.
 """
 
 #: The same .task file the browser loads, so training and inference see the
@@ -218,10 +226,11 @@ def init_worker(model: str, min_score: float) -> None:
         # TFLite reports a failed tensor allocation as an opaque RET_CHECK,
         # never as "out of memory", which sends you looking in the wrong place.
         raise RuntimeError(
-            "could not start a hand detector in this worker, which usually "
-            "means memory ran short. Try fewer --workers (the default is "
-            f"{DEFAULT_WORKERS}) or close other heavy processes. Underlying "
-            f"error: {error}"
+            "could not start a hand detector in this worker, which means "
+            "memory ran short -- TFLite reports it as a RET_CHECK, never as "
+            f"an out-of-memory error. Use fewer --workers (default "
+            f"{DEFAULT_WORKERS}; each costs about 1 GB of commit) or close "
+            f"other heavy processes. Underlying error: {error}"
         ) from error
 
 
