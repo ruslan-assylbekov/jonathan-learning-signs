@@ -286,13 +286,15 @@ def extract_one(
     while capture.grab():
         if index in wanted:
             ok, frame = capture.retrieve()
-            if ok:
-                image = mp.Image(
-                    image_format=mp.ImageFormat.SRGB,
-                    data=cv2.cvtColor(frame, cv2.COLOR_BGR2RGB),
-                )
+            if ok and frame is not None and frame.size:
+                # The array must be contiguous and must outlive the detection:
+                # mp.Image wraps the buffer rather than copying it, so passing
+                # the conversion's result inline -- with nothing holding a
+                # reference -- crashed the worker with an access violation.
+                rgb = np.ascontiguousarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+                image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
                 record(landmarker.detect(image), job, index, width, height, rows, report)
-                del frame
+                del image, rgb, frame
         index += 1
 
     capture.release()
