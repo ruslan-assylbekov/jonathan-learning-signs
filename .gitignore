@@ -9,3 +9,5 @@ dist/
 *.mp4
 *.avi
 ml/data/*.parquet
+
+ml/data/inspection_report.json
