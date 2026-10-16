@@ -1,0 +1,6 @@
+# Shell scripts and configs run on the Linux VM; a CRLF checkout makes bash
+# fail with "$'\r': command not found". Pin LF regardless of core.autocrlf.
+*.sh text eol=lf
+*.template text eol=lf
+Dockerfile text eol=lf
+*.yml text eol=lf

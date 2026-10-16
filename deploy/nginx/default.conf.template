@@ -1,0 +1,66 @@
+# Rendered by the nginx image at start-up: ${DOMAIN} is substituted from the
+# environment, nginx's own $variables are left alone (the entrypoint only
+# substitutes variables that are actually defined).
+
+# Plain HTTP exists for two things only: Let's Encrypt's challenge, and sending
+# everyone else to HTTPS. The camera needs a secure context (CLAUDE.md 14).
+server {
+    listen 80;
+    server_name ${DOMAIN};
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name ${DOMAIN};
+
+    ssl_certificate     /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    add_header X-Content-Type-Options nosniff always;
+
+    root /usr/share/nginx/html;
+
+    # Only the API's public routes are proxied. /docs and /openapi.json stay
+    # unreachable from outside without having to be switched off in the app.
+    location ~ ^/(auth|me|letters|health)(/|$) {
+        proxy_pass http://api:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # The practice socket. Upgrade/Connection are what make this a WebSocket
+    # rather than a request that hangs; the long read timeout stops nginx
+    # cutting a learner off mid-session after its 60 s default (CLAUDE.md 14).
+    location /ws/ {
+        proxy_pass http://api:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
+
+    # The MediaPipe runtime and model are ~26 MB and change only with a deploy.
+    location /mediapipe/ {
+        expires 30d;
+        add_header Cache-Control "public";
+    }
+
+    location / {
+        try_files $uri /index.html;
+    }
+}

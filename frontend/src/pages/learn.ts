@@ -18,9 +18,6 @@ interface Letter {
   sort_order: number;
 }
 
-/** Any non-empty token is accepted while DEV_AUTH is on (backend M3 replaces this). */
-const DEV_TOKEN = "dev";
-
 export class LearnPage {
   private readonly video = element<HTMLVideoElement>("video");
   private readonly overlay = element<HTMLCanvasElement>("overlay");
@@ -43,6 +40,16 @@ export class LearnPage {
   private correct = false;
   private lastFrameAt = 0;
   private fps = 0;
+
+  /**
+   * @param token JWT from signing in; sent as the socket's first message.
+   * @param onSessionEnded called when the server rejects the token -- it
+   *   expired, or the secret changed -- so the page can ask to sign in again.
+   */
+  constructor(
+    private readonly token: string,
+    private readonly onSessionEnded: () => void,
+  ) {}
 
   async init(): Promise<void> {
     this.startButton.addEventListener("click", () => void this.toggle());
@@ -110,10 +117,17 @@ export class LearnPage {
       resizeOverlay(this.overlay, this.camera.width, this.camera.height);
 
       this.say(this.status, "Connecting…");
-      this.socket = await PracticeSocket.connect(DEV_TOKEN, {
+      this.socket = await PracticeSocket.connect(this.token, {
         onEval: (message, roundTrip) => this.onEval(message, roundTrip),
         onSuccess: () => this.onSuccess(),
-        onError: (error) => this.say(this.feedback, errorText(error.code, error.detail), "fix"),
+        onError: (error) => {
+          if (error.code === "UNAUTHENTICATED") {
+            this.teardown();
+            this.onSessionEnded();
+            return;
+          }
+          this.say(this.feedback, errorText(error.code, error.detail), "fix");
+        },
         onClose: () => this.say(this.status, "Connection closed."),
       });
       this.retarget();

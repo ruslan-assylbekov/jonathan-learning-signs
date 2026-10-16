@@ -15,3 +15,7 @@ ml/data/*.parquet
 frontend/public/mediapipe/
 frontend/dist/
 frontend/node_modules/
+
+# deploy secrets and certificates live only on the server
+deploy/.env
+deploy/certbot/

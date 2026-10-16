@@ -128,26 +128,11 @@ def measure(split: dataset.Split, templates: dict[str, dict[str, Any]]) -> dict[
 
 
 async def apply(templates: dict[str, dict[str, Any]]) -> None:
-    from sqlalchemy import update
-
-    from app.infrastructure.db import models
-    from app.infrastructure.db.repositories import DEFAULT_ALPHABET
+    """Through the backend's loader, so dev and server share one code path."""
+    from app.infrastructure.db import load_templates
     from app.infrastructure.db.session import engine, session_factory
 
-    async with session_factory() as session:
-        updated = 0
-        for letter, entry in templates.items():
-            result = await session.execute(
-                update(models.Letter)
-                .where(
-                    models.Letter.alphabet == DEFAULT_ALPHABET,
-                    models.Letter.symbol == letter,
-                )
-                .values(template_angles=entry["angles"], finger_tolerances=entry["tolerances"])
-                .returning(models.Letter.id)
-            )
-            updated += len(result.all())
-        await session.commit()
+    updated = await load_templates.apply(templates, session_factory)
     await engine.dispose()
     print(f"applied {updated} templates to the database")
     if updated != len(templates):

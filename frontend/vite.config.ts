@@ -9,6 +9,8 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
+      "/auth": { target: "http://127.0.0.1:8000", changeOrigin: true },
+      "/me": { target: "http://127.0.0.1:8000", changeOrigin: true },
       "/letters": { target: "http://127.0.0.1:8000", changeOrigin: true },
       "/health": { target: "http://127.0.0.1:8000", changeOrigin: true },
       "/ws": { target: "ws://127.0.0.1:8000", ws: true },

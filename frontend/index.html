@@ -8,8 +8,31 @@
   <body>
     <header>
       <h1>Sign Language Learning Assistant</h1>
-      <p id="status">Loading…</p>
+      <div class="row">
+        <p id="status">Loading…</p>
+        <span id="account" hidden>
+          <span id="account-email" class="muted"></span>
+          <button id="sign-out" type="button">Sign out</button>
+        </span>
+      </div>
     </header>
+
+    <form id="auth" class="panel auth" hidden>
+      <h2>Sign in to practise</h2>
+      <p class="muted">Your progress is saved to your account. Video never leaves your device.</p>
+      <label>Email <input id="auth-email" type="email" autocomplete="email" required /></label>
+      <label>Password
+        <input id="auth-password" type="password" minlength="8" maxlength="72"
+               autocomplete="current-password" required />
+      </label>
+      <p id="auth-error" class="fix" role="alert"></p>
+      <div class="row">
+        <button id="sign-in" type="submit">Sign in</button>
+        <button id="register" type="button">Create account</button>
+      </div>
+    </form>
+
+    <div id="app" hidden>
 
     <p id="banner" class="banner" hidden>
       <strong>Stub mode.</strong> No model is trained yet, so these targets are
@@ -39,6 +62,7 @@
         <p class="muted">Detected: <span id="detected">–</span></p>
       </aside>
     </main>
+    </div>
   </body>
   <script type="module" src="/src/main.ts"></script>
 </html>

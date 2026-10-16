@@ -44,7 +44,7 @@ Do not start a lower tier until the tier above works end-to-end.
    signer-independent evaluation.
 3. Backend: auth, letters, WebSocket evaluation, attempts, progress.
 4. Frontend: camera, skeleton overlay, Learn mode with per-finger hints.
-5. Deployed on OCI with HTTPS, via Docker Compose.
+5. Deployed on Azure with HTTPS, via Docker Compose.
 6. Experiments: bandwidth, latency, load test.
 
 **Tier 2 — should have**
@@ -78,7 +78,7 @@ reference.
 | ML | MediaPipe Tasks (Python, for dataset extraction/collection), OpenCV, NumPy, pandas, pyarrow (Parquet), scikit-learn, joblib |
 | Frontend | Vite + TypeScript (vanilla, no framework), `@mediapipe/tasks-vision`, Canvas API |
 | Infra | Docker, Docker Compose, Nginx, Let's Encrypt (certbot), DuckDNS |
-| Cloud | Oracle Cloud Infrastructure (OCI) Ubuntu VM (existing account) |
+| Cloud | Microsoft Azure Ubuntu VM (Azure for Students subscription; switched from OCI 2026-10-17) |
 | CI/CD | GitHub Actions |
 | Monitoring | Prometheus, Grafana |
 | Load testing | Locust (WebSocket users) |
@@ -462,24 +462,33 @@ make loadtest     # locust against the target in LOADTEST_HOST
 
 ---
 
-## 14. Deployment (OCI)
+## 14. Deployment (Azure)
 
-Production = `deploy/docker-compose.prod.yml` on the OCI Ubuntu VM:
-nginx, api, postgres, redis, prometheus, grafana.
+Production = `deploy/docker-compose.prod.yml` on an Azure Ubuntu VM:
+nginx, api, postgres, redis, prometheus, grafana. Step-by-step in
+`deploy/README.md`.
 
 Known pitfalls — check these first when something does not work:
-1. **OCI firewall is two layers.** Open 80/443 in the subnet Security List
-   **and** on the VM itself: Oracle Ubuntu images ship iptables rules that
-   reject inbound traffic except SSH.
-2. **Camera requires HTTPS.** `getUserMedia` works only in a secure context
+1. **Inbound ports live in the Network Security Group.** Open 80 and 443 in
+   the VM's NSG (Networking → inbound port rules). Azure's Ubuntu images do
+   not firewall on the VM itself (ufw is inactive), unlike OCI's.
+2. **The public IP may change.** A dynamic IP is released when the VM is
+   deallocated (stopped from the portal), and comes back different. DuckDNS is
+   updated by a cron job on the VM, so the domain follows it; a Standard
+   static IP avoids the issue at a small monthly cost.
+3. **Student credit is finite.** Azure for Students gives a fixed credit.
+   Deallocate the VM when it is not in use — a stopped-but-allocated VM still
+   bills compute. Size: 4 GiB RAM (e.g. B2s) fits the full stack; 1 GiB (B1s)
+   does not. Some subscriptions restrict regions or sizes by policy.
+4. **Camera requires HTTPS.** `getUserMedia` works only in a secure context
    (or localhost). Use a DuckDNS domain + certbot; auto-renew via cron/timer.
-3. **WebSocket through Nginx** needs `proxy_http_version 1.1`,
+5. **WebSocket through Nginx** needs `proxy_http_version 1.1`,
    `Upgrade`/`Connection` headers and a larger `proxy_read_timeout`.
-4. **CPU architecture.** Check `uname -m` on the VM. If it is `aarch64`
-   (Ampere shape), build images for `linux/arm64` with `docker buildx`.
-5. **Small VM.** Check `free -h` / `nproc`. If RAM is tight, run
+6. **CPU architecture.** Check `uname -m`. B-series sizes are x86_64; an Arm
+   size (`aarch64`) needs images built for `linux/arm64` with `docker buildx`.
+7. **Small VM.** Check `free -h` / `nproc`. If RAM is tight, run
    Prometheus/Grafana only during experiments (compose profile `monitoring`).
-6. Self-host MediaPipe wasm and `.task` model under `frontend/public/` —
+8. Self-host MediaPipe wasm and `.task` model under `frontend/public/` —
    do not rely on a CDN during the demo.
 
 CI/CD (GitHub Actions): lint + tests → build images → push to GHCR →
@@ -512,7 +521,7 @@ info (VM shape, CPU, RAM, OS, Docker version) next to the results.
    frames. JPEG sizes are measured **offline** from recorded video
    (encode at several qualities/resolutions) — not by sending images to the app.
 2. **Latency:** end-to-end round trip (p50/p95/p99) using `seq`/`t_client`;
-   local Docker vs OCI deployment; split into network vs `server_ms`.
+   local Docker vs Azure deployment; split into network vs `server_ms`.
 3. **Load test:** Locust users streaming frames at 15 Hz over WebSocket;
    increase users until p95 latency or error rate breaks a threshold.
 4. **Horizontal scaling:** 1 / 2 / 4 API replicas behind Nginx; max
@@ -537,7 +546,7 @@ Draft in `docs/report/`. Planned structure:
 1. Introduction and motivation
 2. Related work (Bukva and other RSL/KSL dactyl datasets, landmark-based
    fingerspelling recognition, MediaPipe, sign language trainers)
-3. Cloud architecture — SaaS application on IaaS (OCI VM, public cloud);
+3. Cloud architecture — SaaS application on IaaS (Azure VM, public cloud);
    containers vs VMs; why edge processing in the browser + cloud backend
 4. Implementation (backend, gesture pipeline, frontend, deployment, CI/CD)
 5. Experiments and results (§16)
@@ -581,7 +590,7 @@ Update checkboxes as work progresses.
 - [ ] **M4 — Frontend:** camera, landmarker, overlay with finger highlighting,
       Learn mode end-to-end, browser-landmark validation of the model
       (done: all but browser-landmark validation, which needs webcam data)
-- [ ] **M5 — Deploy:** OCI + HTTPS + Nginx WS, CD pipeline, monitoring
+- [ ] **M5 — Deploy:** Azure + HTTPS + Nginx WS, CD pipeline, monitoring
 - [ ] **M6 — Experiments:** bandwidth, latency, load test, scaling, models
 - [ ] **M7 — Delivery:** README with screenshots/GIF, report, demo video, slides
 

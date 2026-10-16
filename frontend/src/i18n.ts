@@ -71,7 +71,7 @@ export function demoExtendedFingers(symbol: string): boolean[] | null {
 }
 
 export const ERRORS: Record<string, string> = {
-  UNAUTHENTICATED: "Not authenticated. Is DEV_AUTH=true in the backend .env?",
+  UNAUTHENTICATED: "Your session has ended. Please sign in again.",
   NOT_STARTED: "Session was not started.",
   UNKNOWN_LETTER: "The backend does not know that target.",
   INVALID_FRAME: "That frame could not be read.",

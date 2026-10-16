@@ -1,0 +1,99 @@
+# Production stack (CLAUDE.md 14). Run from the repository root:
+#
+#   docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d --build
+#
+# Secrets come from deploy/.env, which lives only on the server.
+
+name: sign-assistant
+
+services:
+  nginx:
+    build: ../frontend
+    depends_on:
+      api:
+        condition: service_healthy
+    ports: ["80:80", "443:443"]
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in deploy/.env}
+    volumes:
+      - ./nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+      - ./certbot/www:/var/www/certbot:ro
+    # Reload every 6 hours so a certificate renewed by certbot is picked up
+    # without anyone having to restart nginx.
+    command: >-
+      /bin/sh -c "while :; do sleep 6h & wait $${!}; nginx -s reload; done &
+      exec /docker-entrypoint.sh nginx -g 'daemon off;'"
+    restart: unless-stopped
+
+  certbot:
+    image: certbot/certbot:v2.11.0
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    entrypoint: >-
+      /bin/sh -c "trap exit TERM; while :; do certbot renew --quiet;
+      sleep 12h & wait $${!}; done"
+    restart: unless-stopped
+
+  api:
+    build: ../backend
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment: &api-env
+      DATABASE_URL: postgresql+asyncpg://sign:${POSTGRES_PASSWORD:?set in deploy/.env}@postgres:5432/sign
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET:?set in deploy/.env}
+      JWT_TTL_MIN: ${JWT_TTL_MIN:-120}
+      MODEL_PATH: /srv/ml/artifacts/model-v2.joblib
+      CONFIDENCE_THRESHOLD: ${CONFIDENCE_THRESHOLD:-0.7}
+      HOLD_FRAMES: ${HOLD_FRAMES:-10}
+      CORS_ORIGINS: https://${DOMAIN}
+      LOG_LEVEL: INFO
+      # Never on in production: it accepts any token (CLAUDE.md 11).
+      DEV_AUTH: "false"
+    volumes: &artifacts
+      - ../ml/artifacts:/srv/ml/artifacts:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    restart: unless-stopped
+
+  # One-shot: schema migrations, then hint templates. A separate service so
+  # that running several api replicas (CLAUDE.md 16.4) never runs migrations
+  # concurrently.
+  migrate:
+    build: ../backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment: *api-env
+    volumes: *artifacts
+    command: >-
+      /bin/sh -c "alembic upgrade head &&
+      python -m app.infrastructure.db.load_templates /srv/ml/artifacts/templates-v2.json"
+    restart: "no"
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: sign
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in deploy/.env}
+      POSTGRES_DB: sign
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sign -d sign"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+
+volumes:
+  pgdata:
