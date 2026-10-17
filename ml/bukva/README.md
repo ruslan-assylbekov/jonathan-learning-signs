@@ -89,8 +89,7 @@ attempt only costs the chunks that were in flight.
   78-dimensional vectors with no rejections, coordinates within [-3.3, 2.7]
   and angles within [0°, 178°].
 
-One thing to weigh before training: **`no_sign` has 373 frames against a median
-of 845 per letter**, because a clip of "no sign" often shows no hand at all and
-those frames are dropped. The frames that remain are the useful ones — a hand
-in view that is not forming a letter — but the class is half the size of the
-others and will need weighting, or more frames sampled from those clips.
+`no_sign` has 373 frames against a median of 845 per letter, because a clip of
+"no sign" often shows no hand at all and those frames are dropped. It was
+weighted in model-v1 and still failed, and is no longer trained on; see
+CLAUDE.md 6.4 and `experiments/models/no_sign_weighting.py`.

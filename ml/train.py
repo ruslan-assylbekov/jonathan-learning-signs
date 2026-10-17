@@ -7,13 +7,13 @@ The official test signers are touched once, at the end, to report the chosen
 model -- never to choose it.
 
 Usage:
-    uv run --group ml python ml/train.py [--version 1]
+    uv run --group ml python ml/train.py [--version N]   (default: next unused)
 
 Writes:
     ml/artifacts/model-vN.joblib    the fitted sklearn pipeline
     ml/artifacts/model-vN.json      metadata the backend checks at startup
-    experiments/models/cv_folds.csv every candidate, every fold
-    experiments/models/summary.json candidates ranked, chosen model, test score
+    experiments/models/cv_folds-vN.csv  every candidate, every fold
+    experiments/models/summary-vN.json  candidates ranked, chosen model, test score
 """
 
 from __future__ import annotations
@@ -53,9 +53,9 @@ LATENCY_SAMPLES = 500
 def candidates() -> dict[str, Callable[[], Pipeline]]:
     """Everything worth comparing, as factories so each fold starts clean.
 
-    no_sign has about half the frames of a letter (ml/bukva/README.md), so
-    every candidate that can weight classes does. kNN cannot, and is kept as
-    the honest unweighted baseline.
+    Letters do not have equal numbers of frames (101-125 clips each, minus
+    frames with no hand detected), so every candidate that can weight classes
+    does. kNN cannot, and is kept as the honest unweighted baseline.
     """
     return {
         "knn": lambda: make_pipeline(
@@ -90,9 +90,24 @@ def main() -> None:
     if isinstance(sys.stdout, io.TextIOWrapper):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--version", type=int, default=1)
+    parser.add_argument(
+        "--version",
+        type=int,
+        help="artifact version to write (default: one above the highest existing)",
+    )
     parser.add_argument("--only", help="train just this candidate, skipping selection")
     args = parser.parse_args()
+    existing = dataset.model_versions()
+    if args.version is None:
+        args.version = (existing[-1] if existing else 0) + 1
+    elif args.version in existing:
+        # Overwriting a model the app or the report already depends on is how
+        # numbers quietly stop matching their artifact.
+        raise SystemExit(
+            f"model-v{args.version} already exists. Pick a new --version, or "
+            "delete the old artifact deliberately first."
+        )
+    print(f"training model-v{args.version}")
 
     print("loading and extracting features ...")
     data = dataset.load()
@@ -289,8 +304,8 @@ def save(
     meta_path = ARTIFACTS / f"model-v{version}.json"
     meta_path.write_text(json.dumps(metadata, indent=2, ensure_ascii=False), encoding="utf-8")
 
-    folds.to_csv(EXPERIMENTS / "cv_folds.csv", index=False)
-    (EXPERIMENTS / "summary.json").write_text(
+    folds.to_csv(EXPERIMENTS / f"cv_folds-v{version}.csv", index=False)
+    (EXPERIMENTS / f"summary-v{version}.json").write_text(
         json.dumps(
             {"ranking": ranking, "chosen": name, "test": test, "latency_model_only": latency},
             indent=2,

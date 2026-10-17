@@ -6,7 +6,7 @@ script feeds back into model choice; train.py made that choice on training
 signers alone.
 
 Usage:
-    uv run --group ml python ml/evaluate.py [--version 1]
+    uv run --group ml python ml/evaluate.py [--version N]   (default: the newest model)
 
 Writes experiments/models/eval-vN.json and eval-vN.md, plus the confusion
 matrix as confusion-vN.csv (rows: true class, columns: predicted).
@@ -38,7 +38,7 @@ def main() -> None:
     if isinstance(sys.stdout, io.TextIOWrapper):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--version", type=int, default=1)
+    parser.add_argument("--version", type=int, help="model version (default: the newest)")
     parser.add_argument(
         "--threshold",
         type=float,
@@ -46,6 +46,11 @@ def main() -> None:
         help="confidence the stabilizer requires (default: CONFIDENCE_THRESHOLD)",
     )
     args = parser.parse_args()
+    if args.version is None:
+        versions = dataset.model_versions()
+        if not versions:
+            raise SystemExit("no model in ml/artifacts; run `make train` first")
+        args.version = versions[-1]
 
     metadata = json.loads((ARTIFACTS / f"model-v{args.version}.json").read_text(encoding="utf-8"))
     if metadata["feature_version"] != FEATURE_VERSION:
@@ -238,7 +243,7 @@ def markdown(report: dict[str, Any]) -> str:
         "",
         "Not comparable with the Bukva paper's 83.6% top-1: that is a video model over",
         "all 33 letters including dynamic ones; this is a single-frame landmark",
-        "classifier over 25 static letters plus no_sign.",
+        "classifier over the static letters only.",
         "",
     ]
     return "\n".join(lines)

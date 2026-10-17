@@ -45,7 +45,11 @@ Note from the paper, worth remembering when reading the confusion matrix:
 
 ## The no-sign class
 
-Bukva labels it `no_event` (105 clips). The code calls it `no_sign`
-(`stabilizer.NO_SIGN`), so extraction maps one to the other in `labels.json`.
+Bukva labels it `no_event` (105 clips). Extraction stores those frames as
+`no_sign`, but the classifier is **not** trained on them: model-v1 had a
+`no_sign` class and it failed (F1 0.06 on unseen signers, swallowing real
+letters), so CLAUDE.md 6.4 now has none and a hand that is not forming the
+target simply counts as a miss.
+
 Those 105 clips exist only under `trimmed/`, which is why the annotation table
 has 3,862 rows while `original/` holds the 3,757 the paper counts.

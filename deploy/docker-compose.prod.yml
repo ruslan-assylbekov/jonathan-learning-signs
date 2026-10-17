@@ -46,7 +46,8 @@ services:
       REDIS_URL: redis://redis:6379/0
       JWT_SECRET: ${JWT_SECRET:?set in deploy/.env}
       JWT_TTL_MIN: ${JWT_TTL_MIN:-120}
-      MODEL_PATH: /srv/ml/artifacts/model-v2.joblib
+      # Which artifacts to serve; bump both when a new model is trained.
+      MODEL_PATH: /srv/ml/artifacts/${MODEL_FILE:-model-v2.joblib}
       CONFIDENCE_THRESHOLD: ${CONFIDENCE_THRESHOLD:-0.7}
       HOLD_FRAMES: ${HOLD_FRAMES:-10}
       CORS_ORIGINS: https://${DOMAIN}
@@ -70,11 +71,13 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    environment: *api-env
+    environment:
+      <<: *api-env
+      TEMPLATES_FILE: ${TEMPLATES_FILE:-templates-v2.json}
     volumes: *artifacts
     command: >-
       /bin/sh -c "alembic upgrade head &&
-      python -m app.infrastructure.db.load_templates /srv/ml/artifacts/templates-v2.json"
+      python -m app.infrastructure.db.load_templates /srv/ml/artifacts/$${TEMPLATES_FILE:-templates-v2.json}"
     restart: "no"
 
   postgres:

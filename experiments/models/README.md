@@ -3,8 +3,8 @@
 ## Question
 
 Which classifier should turn a 78-dimensional landmark feature vector into one
-of 25 static RSL letters or `no_sign`, judged on signers it has never seen, and
-within the 5 ms per-frame budget of CLAUDE.md 6.4?
+of 25 static RSL letters, judged on signers it has never seen, and within the
+5 ms per-frame budget of CLAUDE.md 6.4?
 
 ## Setup
 
@@ -21,10 +21,10 @@ within the 5 ms per-frame budget of CLAUDE.md 6.4?
 - **Final report:** the chosen model is refit on all training signers and
   scored once on Bukva's official test split, whose signers never appear in
   training. That split takes no part in choosing.
-- **Class imbalance:** `no_sign` has roughly half the frames of a letter.
-  Logistic regression and the random forest use balanced class weights, the MLP
-  balanced sample weights; kNN cannot weight classes and stays as the plain
-  baseline.
+- **Class imbalance:** letters have 101–125 clips each, minus frames with no
+  hand detected. Logistic regression and the random forest use balanced class
+  weights, the MLP balanced sample weights; kNN cannot weight classes and stays
+  as the plain baseline.
 - **Latency:** `predict_proba` on one frame at a time, 500 frames, single
   thread — how the server calls it. Feature extraction is not included; the
   server's `server_ms` covers the whole path.
@@ -40,16 +40,26 @@ make templates   # per-letter hint templates -> ml/artifacts/templates-v2.json
 
 ## Results
 
-Generated files only — nothing below is typed in by hand (CLAUDE.md 16):
+Generated files only — nothing here is typed in by hand (CLAUDE.md 16).
 
-- `cv_folds.csv` — every candidate, every fold
-- `summary.json` — ranking, chosen model, held-out score, latency
-- `eval-v1.md` / `eval-v1.json` — per-class F1, confusions, threshold behaviour
-- `confusion-v1.csv` — rows true class, columns predicted
+**Current: model-v2** (25 static letters, no `no_sign` class):
+
+- `cv_folds-v2.csv` — every candidate, every signer fold
+- `summary-v2.json` — ranking, chosen model, held-out score, latency
+- `eval-v2.md` / `eval-v2.json` — per-class F1, confusions, threshold behaviour
+- `confusion-v2.csv` — rows true class, columns predicted
+
+**Superseded: model-v1** (the same letters plus `no_sign`): `eval-v1.*` and
+`confusion-v1.csv` are kept for the comparison that removed the class. Its
+cross-validation files were overwritten before outputs were versioned; its
+CV summary survives in `ml/artifacts/model-v1.json`.
+
+**`no_sign_weighting.py` / `.csv`** — whether `no_sign`'s failure came from
+class weighting (it did not), measured on training signers only.
 
 ## Not yet measured
 
 - Accuracy on own webcam recordings, the domain-shift check of CLAUDE.md 8.4.
   No webcam set has been recorded yet.
 - Repeated runs with different seeds. Fold-to-fold spread is in
-  `cv_folds.csv`; seed-to-seed spread is not.
+  `cv_folds-v2.csv`; seed-to-seed spread is not.

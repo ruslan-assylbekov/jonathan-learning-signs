@@ -269,7 +269,7 @@ in the same commit, plus integration tests.
 ```json
 {"type": "auth", "token": "<JWT>"}
 {"type": "start", "mode": "learn", "letter_id": 5, "width": 1280, "height": 720}
-{"type": "frame", "seq": 123, "t_client": 1712345678.123,
+{"type": "frame", "seq": 123, "t_client": 1712345678123,
  "handedness": "Right", "mirrored": true,
  "landmarks": [[0.51, 0.62, -0.03], "... 21 items total"]}
 {"type": "stop"}
@@ -301,6 +301,12 @@ Rules:
   getting this wrong trains the model in a mirrored feature space and shows up
   only as unexplained inaccuracy.
 - `seq` and `t_client` are echoed so the client can compute round-trip latency.
+  `t_client` is opaque to the server; the browser client sends milliseconds
+  since the epoch (`Date.now()`). `mode` is `learn` or `practice`.
+- A message that is not JSON, or not valid, gets `INVALID_MESSAGE` and the
+  connection stays open. Leaving a letter unfinished — a new `start`, a `stop`,
+  or disconnecting after at least one frame — records a failed attempt; a
+  passed letter is recorded once, as a success.
 - Frame size travels in `start`, not in every frame: it is a property of the
   camera stream, and repeating it 15 times a second would inflate the payload
   the bandwidth experiment (§16.1) measures. The client **must** send a new
@@ -407,7 +413,12 @@ POST /samples                (data-collection mode, admin only)
 GET  /health                 GET  /metrics            (Prometheus)
 ```
 
-Errors use a consistent shape: `{"error": {"code": "...", "detail": "..."}}`.
+Errors use a consistent shape: `{"error": {"code": "...", "detail": "..."}}`,
+including validation failures (`INVALID_REQUEST`, plus `field`) and unknown
+routes (`NOT_FOUND`); `presentation/api/errors.py` enforces it. Implemented so
+far: auth, letters, `/me/progress`, `/health`. Attempts are recorded through
+the WebSocket rather than `POST /attempts`; `/practice/next`, `/samples` and
+`/metrics` are planned (Tier 2 / M1).
 
 ---
 
@@ -419,8 +430,14 @@ All config via environment variables (pydantic-settings), see `.env.example`:
 DATABASE_URL, REDIS_URL, JWT_SECRET, JWT_TTL_MIN,
 MODEL_PATH, CONFIDENCE_THRESHOLD=0.7, HOLD_FRAMES=10,
 MAX_FPS_PER_CONN=30, CORS_ORIGINS, LOG_LEVEL,
+DEV_AUTH=false   (local only: any token is accepted as one dev account)
 BUKVA_DIR (ml scripts only)
 ```
+
+`JWT_SECRET` must be at least 32 characters unless `DEV_AUTH` is on; the app
+refuses to start otherwise. The production stack (`deploy/.env`) also takes
+`DOMAIN`, `LETSENCRYPT_EMAIL`, `POSTGRES_PASSWORD`, `DUCKDNS_SUBDOMAIN`,
+`DUCKDNS_TOKEN`, and optionally `MODEL_FILE` / `TEMPLATES_FILE`.
 
 Never commit `.env`, secrets, SSH keys or certificates.
 
@@ -431,17 +448,21 @@ Never commit `.env`, secrets, SSH keys or certificates.
 Run from Git Bash or WSL on Windows (Makefile targets).
 
 ```
-make dev          # docker compose up (api, postgres, redis) + vite dev server
+make setup        # postgres + redis, migrations, shipped hint templates
+make dev          # setup, then the API on :8000 with reload
+make web          # frontend on :5173 (vendor MediaPipe, vite dev server)
 make test         # pytest (unit + integration)
-make lint         # ruff check + ruff format --check + mypy
+make lint         # ruff check + format --check + mypy (backend, ml, experiments) + tsc
 make fmt          # ruff format
 make migrate      # alembic upgrade head
 make revision m="msg"   # new alembic migration
+make load-templates     # apply ml/artifacts/templates-v2.json; no dataset needed
+make inspect      # ml/bukva/inspect_dataset.py
 make extract      # ml/bukva/extract_landmarks.py → ml/data/bukva_landmarks.parquet
-make train        # ml/train.py → ml/artifacts/model-vN.*
-make eval         # ml/evaluate.py, signer-independent splits
-make templates    # ml/build_templates.py --apply → letters.template_angles + finger_tolerances
-make loadtest     # locust against the target in LOADTEST_HOST
+make train        # ml/train.py → the next unused ml/artifacts/model-vN.*; never overwrites
+make eval         # ml/evaluate.py on the newest model (or v=N)
+make templates    # ml/build_templates.py --apply: rebuild from the dataset and apply
+make loadtest     # planned (CLAUDE.md 16.3); currently exits with a notice
 ```
 
 `ml/collect.py` is run manually on Windows: `python ml/collect.py --participant P01`.
@@ -584,7 +605,8 @@ Update checkboxes as work progresses.
       (done: download, inspection, extraction; open: collect.py, visualize.py,
       own webcam set)
 - [x] **M2 — Model:** `features.py` with unit tests, `train.py`,
-      `evaluate.py` (signer-independent + confusion matrix), templates, model-v1
+      `evaluate.py` (signer-independent + confusion matrix), templates,
+      model-v2 (v1, with a no_sign class, superseded)
 - [x] **M3 — Backend:** DB + migrations, auth, letters, WebSocket evaluation,
       attempts/progress, integration tests
 - [ ] **M4 — Frontend:** camera, landmarker, overlay with finger highlighting,

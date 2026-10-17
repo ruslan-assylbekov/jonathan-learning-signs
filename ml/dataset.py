@@ -19,6 +19,7 @@ import numpy.typing as npt
 import pandas as pd
 
 from app.domain.gesture.features import (
+    FEATURE_LENGTH,
     FEATURE_VERSION,
     FINGERS,
     JOINTS,
@@ -30,6 +31,7 @@ from app.domain.gesture.features import (
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_PARQUET = ROOT / "ml" / "data" / "bukva_landmarks.parquet"
 LABELS_FILE = ROOT / "ml" / "labels.json"
+ARTIFACTS = ROOT / "ml" / "artifacts"
 
 COORD_COLUMNS = [f"{axis}{index}" for index in range(21) for axis in "xyz"]
 
@@ -55,6 +57,16 @@ class Dataset:
     classes: list[str]
     sha256: str
     feature_version: int = FEATURE_VERSION
+
+
+def model_versions() -> list[int]:
+    """Versions with a model-vN.json in ml/artifacts, ascending."""
+    versions = []
+    for path in ARTIFACTS.glob("model-v*.json"):
+        suffix = path.stem.removeprefix("model-v")
+        if suffix.isdigit():
+            versions.append(int(suffix))
+    return sorted(versions)
 
 
 def load_classes() -> list[str]:
@@ -108,7 +120,7 @@ def _split(frame: pd.DataFrame) -> Split:
         angles.append(features.angles)
 
     return Split(
-        features=np.vstack(vectors) if vectors else np.empty((0, 78)),
+        features=np.vstack(vectors) if vectors else np.empty((0, FEATURE_LENGTH)),
         labels=frame["letter"].to_numpy(dtype=str),
         signers=frame["signer_id"].to_numpy(dtype=str),
         videos=frame["video_id"].to_numpy(dtype=str),

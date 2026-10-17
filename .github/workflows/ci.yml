@@ -29,9 +29,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
       - run: uv sync --group ml
-      - run: uv run ruff check . ../ml
-      - run: uv run ruff format --check . ../ml
-      - run: uv run mypy app tests ../ml
+      - run: uv run ruff check . ../ml ../experiments
+      - run: uv run ruff format --check . ../ml ../experiments
+      - run: uv run mypy app tests ../ml ../experiments
       - run: uv run alembic upgrade head
       - run: uv run pytest
 

@@ -55,6 +55,9 @@ select = ["E", "F", "I", "B", "UP"]
 [tool.mypy]
 strict = true
 plugins = ["pydantic.mypy"]
+# ml/ scripts import each other as top-level modules (python ml/train.py puts
+# ml/ on sys.path); experiments import them the same way.
+mypy_path = "../ml"
 
 # MediaPipe and scikit-learn ship no type information, so their surfaces are
 # untyped by necessity. Everything we build on top of them stays strictly typed.
