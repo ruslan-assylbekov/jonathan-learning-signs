@@ -40,6 +40,11 @@ export class LearnPage {
   private correct = false;
   private lastFrameAt = 0;
   private fps = 0;
+  /** Frame size the server was last told about in a start message. */
+  private frameWidth = 0;
+  private frameHeight = 0;
+  /** The delayed move to the next letter after a success, if one is pending. */
+  private pendingAdvance: number | null = null;
 
   /**
    * @param token JWT from signing in; sent as the socket's first message.
@@ -53,7 +58,11 @@ export class LearnPage {
 
   async init(): Promise<void> {
     this.startButton.addEventListener("click", () => void this.toggle());
-    this.targetSelect.addEventListener("change", () => this.retarget());
+    this.targetSelect.addEventListener("change", () => {
+      // A manual choice wins over an automatic advance still waiting to fire.
+      this.cancelPendingAdvance();
+      this.retarget();
+    });
 
     try {
       this.letters = await fetchLetters();
@@ -109,12 +118,18 @@ export class LearnPage {
   private async launch(): Promise<void> {
     this.startButton.disabled = true;
     try {
-      this.say(this.status, "Loading the hand model…");
-      this.landmarker = await createLandmarker();
+      if (!this.landmarker) {
+        // Created once and reused: each detector holds WASM and GPU memory,
+        // and a new one per Start would leak it on every restart.
+        this.say(this.status, "Loading the hand model…");
+        this.landmarker = await createLandmarker();
+      }
 
       this.say(this.status, "Asking for the camera…");
       this.camera = await startCamera(this.video);
-      resizeOverlay(this.overlay, this.camera.width, this.camera.height);
+      this.frameWidth = this.camera.width;
+      this.frameHeight = this.camera.height;
+      resizeOverlay(this.overlay, this.frameWidth, this.frameHeight);
 
       this.say(this.status, "Connecting…");
       this.socket = await PracticeSocket.connect(this.token, {
@@ -128,14 +143,20 @@ export class LearnPage {
           }
           this.say(this.feedback, errorText(error.code, error.detail), "fix");
         },
-        onClose: () => this.say(this.status, "Connection closed."),
+        onClose: () => {
+          // Closing it ourselves (Stop) has already torn down; anything else
+          // means the server went away while the camera was still running.
+          if (!this.running) return;
+          this.teardown();
+          this.say(this.status, "Connection lost. Press Start camera to reconnect.", "fix");
+        },
       });
       this.retarget();
 
       this.running = true;
       this.startButton.textContent = "Stop";
       this.startButton.disabled = false;
-      this.say(this.status, `Live · ${this.camera.width}×${this.camera.height}`);
+      this.say(this.status, `Live · ${this.frameWidth}×${this.frameHeight}`);
       requestAnimationFrame((time) => this.loop(time));
     } catch (error) {
       this.say(this.status, message(error), "fix");
@@ -149,7 +170,7 @@ export class LearnPage {
     const target = this.target;
     if (!this.socket || !this.camera || !target) return;
 
-    this.socket.start(target.id, this.camera.width, this.camera.height);
+    this.socket.start(target.id, this.frameWidth, this.frameHeight);
     this.hints = [];
     this.correct = false;
     this.holdBar.style.width = "0%";
@@ -159,16 +180,36 @@ export class LearnPage {
   private loop(timestamp: number): void {
     if (!this.running || !this.camera || !this.landmarker) return;
 
+    this.followResolution();
+
     const hand = detectHand(this.landmarker, this.camera.video, timestamp);
     if (hand) {
       this.onHand(hand, timestamp);
     } else {
+      // No frame is sent, so the server's hold count stands; the bar is left
+      // where it is rather than pretending the progress was lost.
       clearOverlay(this.overlay);
       this.detected.textContent = "no hand in frame";
-      this.holdBar.style.width = "0%";
     }
 
     requestAnimationFrame((next) => this.loop(next));
+  }
+
+  /**
+   * Re-send start when the camera's frame size changes -- a phone rotating,
+   * another camera picked. Landmarks are normalized against the frame, so
+   * frames sent under a stale size would be scaled wrongly (CLAUDE.md 7).
+   */
+  private followResolution(): void {
+    const { videoWidth, videoHeight } = this.video;
+    if (!videoWidth || !videoHeight) return;
+    if (videoWidth === this.frameWidth && videoHeight === this.frameHeight) return;
+
+    this.frameWidth = videoWidth;
+    this.frameHeight = videoHeight;
+    resizeOverlay(this.overlay, videoWidth, videoHeight);
+    this.say(this.status, `Live · ${videoWidth}×${videoHeight}`);
+    this.retarget();
   }
 
   private onHand(hand: DetectedHand, timestamp: number): void {
@@ -210,17 +251,27 @@ export class LearnPage {
     this.say(this.feedback, "Correct.", "good");
     this.hintList.replaceChildren();
 
-    const index = this.letters.findIndex((letter) => letter.id === this.target?.id);
-    const next = this.letters[(index + 1) % this.letters.length];
-    if (next) {
+    // Let the learner see the result before the target changes. The selection
+    // moves only when the server is told, so the two never disagree.
+    this.cancelPendingAdvance();
+    this.pendingAdvance = window.setTimeout(() => {
+      this.pendingAdvance = null;
+      const index = this.letters.findIndex((letter) => letter.id === this.target?.id);
+      const next = this.letters[(index + 1) % this.letters.length];
+      if (!next) return;
       this.targetSelect.value = String(next.id);
-      // Let the learner see the result before the target changes under them.
-      window.setTimeout(() => this.retarget(), 900);
-    }
+      this.retarget();
+    }, 900);
+  }
+
+  private cancelPendingAdvance(): void {
+    if (this.pendingAdvance !== null) window.clearTimeout(this.pendingAdvance);
+    this.pendingAdvance = null;
   }
 
   private teardown(): void {
     this.running = false;
+    this.cancelPendingAdvance();
     this.socket?.close();
     this.camera?.stop();
     this.socket = null;

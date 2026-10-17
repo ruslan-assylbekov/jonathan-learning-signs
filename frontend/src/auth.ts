@@ -68,28 +68,24 @@ async function authenticate(path: string, email: string, password: string): Prom
   return session;
 }
 
-/** One readable sentence from either error shape the backend produces. */
+/** One readable sentence from the backend's error shape (CLAUDE.md 10). */
 async function explain(response: Response): Promise<string> {
   const body = (await response.json().catch(() => null)) as {
-    detail?: { error?: { code?: string; detail?: string } } | { msg?: string; loc?: string[] }[];
+    error?: { code?: string; detail?: string; field?: string };
   } | null;
-  const detail = body?.detail;
+  const error = body?.error;
 
-  if (Array.isArray(detail)) {
-    // FastAPI validation errors: name the field rather than dump the list.
-    const field = detail[0]?.loc?.at(-1);
-    if (field === "email") return "That does not look like an email address.";
-    if (field === "password") return "The password must be 8 to 72 characters.";
-    return "Please check the form.";
-  }
-
-  switch (detail?.error?.code) {
+  switch (error?.code) {
     case "BAD_CREDENTIALS":
       return "Email or password is wrong.";
     case "EMAIL_TAKEN":
       return "An account with this email already exists. Sign in instead.";
     case "WEAK_PASSWORD":
-      return detail.error.detail ?? "Choose a stronger password.";
+      return error.detail ?? "Choose a stronger password.";
+    case "INVALID_REQUEST":
+      if (error.field === "email") return "That does not look like an email address.";
+      if (error.field === "password") return "The password must be 8 to 72 characters.";
+      return "Please check the form.";
     default:
       return `Something went wrong (HTTP ${response.status}).`;
   }

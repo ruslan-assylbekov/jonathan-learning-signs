@@ -100,7 +100,7 @@ export class PracticeSocket {
         resolve(new PracticeSocket(socket, handlers));
       });
       socket.addEventListener("error", () =>
-        reject(new Error("Could not reach the backend. Is it running on port 8000?")),
+        reject(new Error("Could not reach the server's practice socket.")),
       );
     });
   }

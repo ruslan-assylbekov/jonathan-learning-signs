@@ -22,21 +22,37 @@ export interface DetectedHand {
 export class LandmarkerError extends Error {}
 
 export async function createLandmarker(): Promise<HandLandmarker> {
+  let fileset;
   try {
-    const fileset = await FilesetResolver.forVisionTasks(WASM_PATH);
-    return await HandLandmarker.createFromOptions(fileset, {
-      baseOptions: { modelAssetPath: MODEL_PATH, delegate: "GPU" },
-      runningMode: "VIDEO",
-      numHands: 1,
-      minHandDetectionConfidence: 0.5,
-      minTrackingConfidence: 0.5,
-    });
+    fileset = await FilesetResolver.forVisionTasks(WASM_PATH);
   } catch (cause) {
     throw new LandmarkerError(
-      "Could not load the hand model. Have you run `npm run vendor`?",
+      "Could not load the hand model runtime. Have you run `npm run vendor`?",
       { cause },
     );
   }
+
+  // The GPU delegate needs WebGL2, which some browsers, VMs and locked-down
+  // machines lack; the CPU is slower but works everywhere.
+  for (const delegate of ["GPU", "CPU"] as const) {
+    try {
+      return await HandLandmarker.createFromOptions(fileset, {
+        baseOptions: { modelAssetPath: MODEL_PATH, delegate },
+        runningMode: "VIDEO",
+        numHands: 1,
+        minHandDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5,
+      });
+    } catch (cause) {
+      if (delegate === "CPU") {
+        throw new LandmarkerError(
+          "Could not load the hand model. Have you run `npm run vendor`?",
+          { cause },
+        );
+      }
+    }
+  }
+  throw new LandmarkerError("unreachable");
 }
 
 /**
