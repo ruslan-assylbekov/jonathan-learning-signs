@@ -159,8 +159,11 @@ export class LearnPage {
       this.say(this.status, `Live · ${this.frameWidth}×${this.frameHeight}`);
       requestAnimationFrame((time) => this.loop(time));
     } catch (error) {
-      this.say(this.status, message(error), "fix");
+      // Tear down first: teardown writes "Stopped.", which used to overwrite
+      // the reason and leave the learner with no idea what went wrong.
       this.teardown();
+      this.say(this.status, message(error), "fix");
+      console.error(error);
       this.startButton.disabled = false;
     }
   }
