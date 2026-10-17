@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Request
 from pydantic import BaseModel
+
+from app.presentation.api.errors import api_error
 
 router = APIRouter(tags=["letters"])
 
@@ -27,8 +29,5 @@ async def list_letters(request: Request) -> list[LetterOut]:
 async def get_letter(letter_id: int, request: Request) -> LetterOut:
     letter = await request.app.state.practice_deps.letters.by_id(letter_id)
     if letter is None:
-        raise HTTPException(
-            status_code=404,
-            detail={"error": {"code": "UNKNOWN_LETTER", "detail": f"no letter {letter_id}"}},
-        )
+        raise api_error(404, "UNKNOWN_LETTER", f"no letter {letter_id}")
     return LetterOut(id=letter.id, symbol=letter.symbol, sort_order=letter.sort_order)

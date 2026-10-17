@@ -6,6 +6,7 @@ Transport only: parse a message, call one use case, serialize the result
 
 from __future__ import annotations
 
+import json
 import logging
 import time
 from collections import deque
@@ -75,10 +76,14 @@ class FrameRateLimiter:
 async def practice(websocket: WebSocket) -> None:
     deps: PracticeDeps = websocket.app.state.practice_deps
     await websocket.accept()
+    conversation = _Conversation(websocket, deps)
     try:
-        await _converse(websocket, deps)
+        await conversation.run()
     except WebSocketDisconnect:
         logger.debug("practice socket closed by the client")
+    finally:
+        # Closing the tab mid-letter is giving up on it, like stop.
+        await conversation.abandon()
 
 
 @dataclass
@@ -90,6 +95,9 @@ class Attendance:
     started_at: float
     frames: int = 0
     confidence_total: float = 0.0
+    finished: bool = False
+    """Set once the letter is recorded, so a later stop, switch or disconnect
+    cannot record it a second time -- as a failure, after it was passed."""
 
     def saw(self, confidence: float) -> None:
         self.frames += 1
@@ -107,54 +115,110 @@ class Attendance:
         )
 
 
-async def _converse(websocket: WebSocket, deps: PracticeDeps) -> None:
-    limiter = FrameRateLimiter(deps.max_fps)
-    user_id: int | None = None
-    session: PracticeSession | None = None
-    attendance: Attendance | None = None
+class _Conversation:
+    """One socket's state: who is connected and which letter they are on."""
 
-    while True:
-        payload = await websocket.receive_json()
+    def __init__(self, websocket: WebSocket, deps: PracticeDeps) -> None:
+        self._websocket = websocket
+        self._deps = deps
+        self._limiter = FrameRateLimiter(deps.max_fps)
+        self._user_id: int | None = None
+        self._session: PracticeSession | None = None
+        self._attendance: Attendance | None = None
+
+    async def run(self) -> None:
+        while True:
+            payload = await self._next_payload()
+            if payload is None:
+                continue
+            try:
+                message = _messages.validate_python(payload)
+            except ValidationError as error:
+                await _fail(self._websocket, "INVALID_MESSAGE", _first_problem(error))
+                continue
+            await self._handle(message)
+
+    async def _next_payload(self) -> object | None:
+        """The next parsed message, or None after reporting one that was not JSON.
+
+        A malformed message must cost the sender an error, not the connection:
+        receive_json would raise and drop the socket on a stray binary frame or
+        a typo.
+        """
+        received = await self._websocket.receive()
+        if received["type"] == "websocket.disconnect":
+            raise WebSocketDisconnect(received.get("code", 1000))
+        text = received.get("text")
+        if text is None:
+            await _fail(self._websocket, "INVALID_MESSAGE", "send JSON text frames")
+            return None
         try:
-            message = _messages.validate_python(payload)
-        except ValidationError as error:
-            await _fail(websocket, "INVALID_MESSAGE", _first_problem(error))
-            continue
+            parsed: object = json.loads(text)
+            return parsed
+        except json.JSONDecodeError:
+            await _fail(self._websocket, "INVALID_MESSAGE", "not valid JSON")
+            return None
 
+    async def _handle(self, message: ClientMessage) -> None:
         if isinstance(message, AuthMessage):
-            user_id = deps.tokens.user_id(message.token)
-            if user_id is None:
-                await _fail(websocket, "UNAUTHENTICATED", "token rejected")
-            continue
+            self._user_id = self._deps.tokens.user_id(message.token)
+            if self._user_id is None:
+                await _fail(self._websocket, "UNAUTHENTICATED", "token rejected")
+            return
 
-        if user_id is None:
-            await _fail(websocket, "UNAUTHENTICATED", "send an auth message first")
-            continue
+        if self._user_id is None:
+            await _fail(self._websocket, "UNAUTHENTICATED", "send an auth message first")
+            return
 
         if isinstance(message, StartMessage):
-            letter = await deps.letters.by_id(message.letter_id)
+            letter = await self._deps.letters.by_id(message.letter_id)
             if letter is None:
-                await _fail(websocket, "UNKNOWN_LETTER", f"no letter {message.letter_id}")
-                continue
-            session = await _new_session(message, letter.symbol, deps)
-            attendance = Attendance(
+                await _fail(self._websocket, "UNKNOWN_LETTER", f"no letter {message.letter_id}")
+                return
+            # Moving on from an unfinished letter is giving up on it.
+            await self.abandon()
+            self._session = await _new_session(message, letter.symbol, self._deps)
+            self._attendance = Attendance(
                 letter_id=letter.id, mode=message.mode, started_at=time.perf_counter()
             )
-            continue
+            return
 
         if isinstance(message, StopMessage):
-            # Giving up is a result too: without this, every unfinished letter
-            # would silently vanish and progress would only ever see successes.
-            if attendance is not None and attendance.frames:
-                await _record(deps, attendance, user_id, success=False)
-            session, attendance = None, None
-            continue
+            await self.abandon()
+            self._session = None
+            return
 
-        if session is None or attendance is None:
-            await _fail(websocket, "NOT_STARTED", "send a start message first")
-            continue
+        if self._session is None or self._attendance is None:
+            await _fail(self._websocket, "NOT_STARTED", "send a start message first")
+            return
 
-        await _handle_frame(websocket, message, session, deps, limiter, attendance, user_id)
+        await _handle_frame(
+            self._websocket,
+            message,
+            self._session,
+            self._deps,
+            self._limiter,
+            self._attendance,
+            self._user_id,
+        )
+
+    async def abandon(self) -> None:
+        """Record the current letter as failed, if it was tried and not finished.
+
+        Giving up is a result too: without it only successes would reach
+        progress, and a letter someone keeps abandoning would look untouched.
+        A letter never shown a single frame is not an attempt.
+        """
+        attendance, self._attendance = self._attendance, None
+        if (
+            attendance is None
+            or attendance.finished
+            or not attendance.frames
+            or self._user_id is None
+        ):
+            return
+        attendance.finished = True
+        await _record(self._deps, attendance, self._user_id, success=False)
 
 
 async def _new_session(message: StartMessage, target: str, deps: PracticeDeps) -> PracticeSession:
@@ -208,6 +272,7 @@ async def _handle_frame(
                 letter_id=attendance.letter_id, time_to_success_ms=taken_ms
             ).model_dump_json()
         )
+        attendance.finished = True
         await _record(deps, attendance, user_id, success=True, elapsed_ms=taken_ms)
 
 

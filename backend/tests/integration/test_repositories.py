@@ -143,3 +143,24 @@ async def test_a_malformed_template_is_not_silently_ignored(alphabet: str) -> No
 
     with pytest.raises(ValueError, match="pinky"):
         await DbTemplateSource(session_factory, alphabet=alphabet).template_for("A")
+
+
+async def test_a_hidden_letter_cannot_be_reached_by_id(alphabet: str) -> None:
+    """Regression: by_id used to return any row, so a WebSocket start could
+    target a dynamic letter that all() hid and the model never predicts."""
+    static_id = await add_letter(alphabet, symbol="S", is_static=True, sort_order=1)
+    dynamic_id = await add_letter(alphabet, symbol="D", is_static=False, sort_order=2)
+    catalog = DbLetterCatalog(session_factory, alphabet=alphabet)
+
+    assert await catalog.by_id(static_id) is not None
+    assert await catalog.by_id(dynamic_id) is None
+
+
+async def test_only_letters_the_model_can_predict_are_offered(alphabet: str) -> None:
+    known = await add_letter(alphabet, symbol="S", is_static=True, sort_order=1)
+    unknown = await add_letter(alphabet, symbol="Q", is_static=True, sort_order=2)
+    catalog = DbLetterCatalog(session_factory, alphabet=alphabet, classes=["S", "T"])
+
+    assert [letter.symbol for letter in await catalog.all()] == ["S"]
+    assert await catalog.by_id(known) is not None
+    assert await catalog.by_id(unknown) is None

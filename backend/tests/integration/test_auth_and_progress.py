@@ -11,13 +11,15 @@ from fastapi.testclient import TestClient
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.application.record_attempt import MASTERY_ALPHA, AttemptRecord, Attempts
+from app.application.record_attempt import AttemptRecord, Attempts
 from app.config import settings
+from app.domain.progress import MASTERY_ALPHA
 from app.infrastructure.auth.tokens import InsecureSecretError, JwtTokens
 from app.infrastructure.db import models
+from app.infrastructure.db.repositories import DbAttemptRepository
 from app.main import build_app
 
-SECRET = "a-real-secret-for-these-tests"
+SECRET = "a-real-secret-for-these-tests-0123456789abcdef"
 PASSWORD = "correct horse battery"
 
 
@@ -57,7 +59,7 @@ def test_the_same_email_cannot_register_twice(client: TestClient) -> None:
     again = client.post("/auth/register", json={"email": email, "password": PASSWORD})
 
     assert again.status_code == 409
-    assert again.json()["detail"]["error"]["code"] == "EMAIL_TAKEN"
+    assert again.json()["error"]["code"] == "EMAIL_TAKEN"
 
 
 def test_email_case_and_padding_do_not_create_a_second_account(client: TestClient) -> None:
@@ -104,7 +106,7 @@ def test_bad_credentials_are_indistinguishable(
     response = client.post("/auth/login", json={"email": email, "password": password})
 
     assert response.status_code == 401
-    assert response.json()["detail"]["error"]["code"] == "BAD_CREDENTIALS"
+    assert response.json()["error"]["code"] == "BAD_CREDENTIALS"
 
 
 def test_progress_needs_a_token(client: TestClient) -> None:
@@ -200,7 +202,7 @@ def test_a_placeholder_jwt_secret_is_refused(
 
 
 def test_a_token_signed_with_another_secret_is_rejected(client: TestClient) -> None:
-    forged = JwtTokens("a-different-secret", ttl_minutes=60).issue(1)
+    forged = JwtTokens("a-different-secret-0123456789abcdef-xyz", ttl_minutes=60).issue(1)
 
     response = client.get("/me/progress", headers={"Authorization": f"Bearer {forged}"})
 
@@ -232,7 +234,7 @@ def _record(
     sessions: async_sessionmaker[AsyncSession], user_id: int, letter_id: int, *, success: bool
 ) -> None:
     _run(
-        Attempts(sessions).record(
+        Attempts(DbAttemptRepository(sessions)).record(
             AttemptRecord(
                 user_id=user_id,
                 letter_id=letter_id,
@@ -266,3 +268,44 @@ def _clean_up(pooled_sessions: async_sessionmaker[AsyncSession]) -> Iterator[Non
             await session.commit()
 
     _run(purge())
+
+
+def test_validation_errors_use_the_documented_shape(client: TestClient) -> None:
+    """CLAUDE.md 10: {"error": {"code", "detail"}}, not FastAPI's {"detail": [...]}.
+    The submitted values are not echoed, since one of them is a password."""
+    response = client.post("/auth/register", json={"email": "not-an-email", "password": PASSWORD})
+
+    assert response.status_code == 422
+    body = response.json()
+    assert body["error"]["code"] == "INVALID_REQUEST"
+    assert body["error"]["field"] == "email"
+    assert PASSWORD not in response.text
+
+
+def test_a_password_over_72_bytes_is_refused_even_under_72_characters(
+    client: TestClient,
+) -> None:
+    """bcrypt reads 72 bytes; 40 Cyrillic letters are 80. Silent truncation
+    would make the tail of such a password meaningless."""
+    response = client.post("/auth/register", json={"email": fresh_email(), "password": "ж" * 40})
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "WEAK_PASSWORD"
+
+
+def test_an_unknown_route_uses_the_documented_shape(client: TestClient) -> None:
+    response = client.get("/no/such/route")
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "NOT_FOUND"
+
+
+def test_a_short_jwt_secret_is_refused(
+    monkeypatch: pytest.MonkeyPatch, pooled_sessions: async_sessionmaker[AsyncSession]
+) -> None:
+    """HS256 needs a 256-bit key; a short one is guessable offline."""
+    monkeypatch.setattr(settings, "dev_auth", False)
+    monkeypatch.setattr(settings, "jwt_secret", "short-but-not-a-placeholder")
+
+    with pytest.raises(InsecureSecretError):
+        build_app(pooled_sessions)

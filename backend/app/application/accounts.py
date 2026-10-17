@@ -1,19 +1,27 @@
-"""Registering and signing in (CLAUDE.md 10)."""
+"""Registering and signing in (CLAUDE.md 10).
+
+Depends only on ports (CLAUDE.md 5): storage, hashing and tokens arrive from
+main.py, which is why these can be tested with in-memory fakes.
+"""
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
+from typing import Final
 
-from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from app.domain.ports import EmailTakenError, PasswordHasher, TokenIssuer, UserRepository
 
-from app.infrastructure.auth.passwords import hash_password, verify_password
-from app.infrastructure.auth.tokens import JwtTokens
-from app.infrastructure.db import models
+__all__ = ["Accounts", "BadCredentialsError", "EmailTakenError", "Session", "WeakPasswordError"]
+
+MIN_PASSWORD_LENGTH: Final = 8
+MAX_PASSWORD_BYTES: Final = 72
+"""bcrypt reads only the first 72 bytes, so a longer password would make every
+character past the limit meaningless. Refused rather than silently truncated.
+Bytes, not characters: 40 Cyrillic letters are 80 bytes."""
 
 
-class EmailTakenError(ValueError):
+class WeakPasswordError(ValueError):
     pass
 
 
@@ -27,31 +35,38 @@ class Session:
     token: str
 
 
+def check_password(password: str) -> None:
+    if len(password) < MIN_PASSWORD_LENGTH:
+        raise WeakPasswordError(f"password must be at least {MIN_PASSWORD_LENGTH} characters")
+    if len(password.encode("utf-8")) > MAX_PASSWORD_BYTES:
+        raise WeakPasswordError(
+            f"password must be at most {MAX_PASSWORD_BYTES} bytes "
+            "(Cyrillic letters take two bytes each)"
+        )
+
+
 class Accounts:
-    def __init__(self, sessions: async_sessionmaker[AsyncSession], tokens: JwtTokens) -> None:
-        self._sessions = sessions
+    def __init__(self, users: UserRepository, hasher: PasswordHasher, tokens: TokenIssuer) -> None:
+        self._users = users
+        self._hasher = hasher
         self._tokens = tokens
+        # A real hash of a value nobody can supply, for the timing guard in
+        # login. Computed once, at startup, where blocking costs nothing.
+        self._dummy_hash = hasher.hash("not-a-real-password-placeholder")
 
     async def register(self, email: str, password: str) -> Session:
         """Create an account.
 
         Raises:
-            WeakPasswordError: from hashing, before anything is written.
-            EmailTakenError: the unique index rejected it.
+            WeakPasswordError: before anything is hashed or written.
+            EmailTakenError: the address is already registered.
         """
-        normalized = email.strip().lower()
-        user = models.User(email=normalized, password_hash=hash_password(password))
-
-        async with self._sessions() as session:
-            session.add(user)
-            try:
-                await session.commit()
-            except IntegrityError as error:
-                await session.rollback()
-                raise EmailTakenError(f"{normalized} is already registered") from error
-            await session.refresh(user)
-
-        return Session(user_id=user.id, token=self._tokens.issue(user.id))
+        check_password(password)
+        # bcrypt is ~0.25 s of pure CPU. Run on the event loop it would freeze
+        # every open practice socket for each registration.
+        password_hash = await asyncio.to_thread(self._hasher.hash, password)
+        user_id = await self._users.create(_normalize(email), password_hash)
+        return Session(user_id=user_id, token=self._tokens.issue(user_id))
 
     async def login(self, email: str, password: str) -> Session:
         """Exchange credentials for a token.
@@ -59,21 +74,18 @@ class Accounts:
         Raises:
             BadCredentialsError: for an unknown email or a wrong password.
         """
-        normalized = email.strip().lower()
-        async with self._sessions() as session:
-            user = (
-                await session.execute(select(models.User).where(models.User.email == normalized))
-            ).scalar_one_or_none()
+        account = await self._users.find_by_email(_normalize(email))
 
-        # Hash a throwaway password when the account does not exist, so that
-        # answering an unknown email takes about as long as answering a known
-        # one and timing does not reveal which addresses are registered.
-        stored = user.password_hash if user else _DUMMY_HASH
-        if not verify_password(password, stored) or user is None:
+        # Check against a throwaway hash when the account does not exist, so an
+        # unknown email takes as long to refuse as a wrong password and timing
+        # does not reveal which addresses are registered.
+        stored = account.password_hash if account else self._dummy_hash
+        matches = await asyncio.to_thread(self._hasher.verify, password, stored)
+        if account is None or not matches:
             raise BadCredentialsError("email or password is wrong")
 
-        return Session(user_id=user.id, token=self._tokens.issue(user.id))
+        return Session(user_id=account.id, token=self._tokens.issue(account.id))
 
 
-#: A real bcrypt hash of a value nobody can supply, for the timing guard above.
-_DUMMY_HASH = hash_password("not-a-real-password-placeholder")
+def _normalize(email: str) -> str:
+    return email.strip().lower()

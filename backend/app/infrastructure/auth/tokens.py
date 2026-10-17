@@ -11,6 +11,9 @@ logger = logging.getLogger(__name__)
 
 ALGORITHM = "HS256"
 INSECURE_SECRETS = {"change-me", "secret", ""}
+MIN_SECRET_LENGTH = 32
+"""HS256 is only as strong as its key; RFC 7518 asks for at least 256 bits.
+deploy/.env.example generates 64 hex characters."""
 
 
 class InsecureSecretError(RuntimeError):
@@ -18,7 +21,7 @@ class InsecureSecretError(RuntimeError):
 
 
 class JwtTokens:
-    """Issues and verifies access tokens. Implements ``TokenVerifier``.
+    """Issues and verifies access tokens. Implements ``TokenIssuer`` and ``TokenVerifier``.
 
     ``user_id`` is carried in ``sub`` as a string, because the JWT spec says
     ``sub`` is a string and some libraries reject an integer outright.
@@ -27,13 +30,14 @@ class JwtTokens:
     def __init__(
         self, secret: str, *, ttl_minutes: int, allow_insecure_secret: bool = False
     ) -> None:
-        if secret in INSECURE_SECRETS:
+        if secret in INSECURE_SECRETS or len(secret) < MIN_SECRET_LENGTH:
             if not allow_insecure_secret:
                 raise InsecureSecretError(
-                    "JWT_SECRET is still the placeholder. Set a real one before "
-                    "issuing tokens anyone could forge."
+                    f"JWT_SECRET is a placeholder or shorter than {MIN_SECRET_LENGTH} "
+                    "characters. Generate one (openssl rand -hex 32) before issuing "
+                    "tokens anyone could forge."
                 )
-            logger.warning("JWT_SECRET is a known placeholder: tokens are forgeable.")
+            logger.warning("JWT_SECRET is weak or a placeholder: tokens are forgeable.")
         self._secret = secret
         self._ttl = timedelta(minutes=ttl_minutes)
 
@@ -57,6 +61,3 @@ class JwtTokens:
             return int(payload["sub"])
         except (jwt.InvalidTokenError, KeyError, TypeError, ValueError):
             return None
-
-    def verify(self, token: str) -> bool:
-        return self.user_id(token) is not None

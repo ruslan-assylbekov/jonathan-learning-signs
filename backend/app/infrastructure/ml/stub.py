@@ -16,11 +16,13 @@ reported as a result (CLAUDE.md 16, honesty rule).
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Final
 
-from app.domain.entities import Letter, Prediction
+from app.domain.entities import AttemptRecord, Letter, Prediction
 from app.domain.gesture.features import FEATURE_VERSION, FINGERS, JOINTS, Features
 from app.domain.gesture.feedback import LetterTemplate
+from app.domain.progress import Standing
 
 LABEL_PREFIX: Final = "demo:"
 
@@ -144,3 +146,18 @@ class StubLetterCatalog:
 
 def _worst_bend(features: Features, finger: str) -> float:
     return max(features.angles[finger][joint] for joint in JOINTS)
+
+
+class StubAttemptRepository:
+    """Implements ``AttemptRepository`` by recording nothing.
+
+    Demo gestures are not letters, and the stub catalog's ids collide with real
+    rows in ``letters`` (id 1 is a demo target here and А in the table), so
+    storing them would credit or fault the wrong letter -- or fail the foreign
+    key for id 0. Stub practice therefore leaves progress untouched.
+    """
+
+    async def record(
+        self, attempt: AttemptRecord, advance: Callable[[Standing | None], Standing]
+    ) -> None:
+        return None

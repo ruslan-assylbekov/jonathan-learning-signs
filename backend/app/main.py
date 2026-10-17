@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import dataclasses
 import logging
+import secrets
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -13,18 +15,30 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.application.accounts import Accounts
 from app.application.record_attempt import Attempts
+from app.application.user_progress import UserProgress
 from app.config import settings
 from app.domain.gesture.features import FEATURE_VERSION
-from app.domain.ports import GestureClassifier, LetterCatalog, TemplateSource, TokenVerifier
+from app.domain.ports import GestureClassifier, LetterCatalog, TemplateSource
 from app.infrastructure.auth.dev import DevTokenVerifier
-from app.infrastructure.auth.passwords import hash_password
+from app.infrastructure.auth.passwords import BcryptHasher
 from app.infrastructure.auth.tokens import JwtTokens
 from app.infrastructure.db import models
-from app.infrastructure.db.repositories import DbLetterCatalog, DbTemplateSource
+from app.infrastructure.db.repositories import (
+    DbAttemptRepository,
+    DbLetterCatalog,
+    DbProgressRepository,
+    DbTemplateSource,
+    DbUserRepository,
+)
 from app.infrastructure.db.session import session_factory
 from app.infrastructure.ml.model import JoblibClassifier
-from app.infrastructure.ml.stub import StubClassifier, StubLetterCatalog, StubTemplates
-from app.presentation.api import auth, letters, progress
+from app.infrastructure.ml.stub import (
+    StubAttemptRepository,
+    StubClassifier,
+    StubLetterCatalog,
+    StubTemplates,
+)
+from app.presentation.api import auth, errors, letters, progress
 from app.presentation.ws import practice
 
 logging.basicConfig(level=settings.log_level)
@@ -44,6 +58,7 @@ def build_app(sessions: async_sessionmaker[AsyncSession] | None = None) -> FastA
 
     classifier, catalog, templates = _gesture_stack(sessions)
     _check_feature_version(classifier)
+    stub = isinstance(classifier, StubClassifier)
 
     tokens = JwtTokens(
         settings.jwt_secret,
@@ -54,13 +69,14 @@ def build_app(sessions: async_sessionmaker[AsyncSession] | None = None) -> FastA
     )
 
     app.state.sessions = sessions
-    app.state.accounts = Accounts(sessions, tokens)
+    app.state.accounts = Accounts(DbUserRepository(sessions), BcryptHasher(), tokens)
+    app.state.user_progress = UserProgress(DbProgressRepository(sessions))
     app.state.practice_deps = practice.PracticeDeps(
         classifier=classifier,
         templates=templates,
         letters=catalog,
         tokens=tokens,
-        attempts=Attempts(sessions),
+        attempts=Attempts(StubAttemptRepository() if stub else DbAttemptRepository(sessions)),
         confidence_threshold=settings.confidence_threshold,
         hold_frames=settings.hold_frames,
         max_fps=settings.max_fps_per_conn,
@@ -72,6 +88,7 @@ def build_app(sessions: async_sessionmaker[AsyncSession] | None = None) -> FastA
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    errors.install(app)
     app.include_router(auth.router)
     app.include_router(letters.router)
     app.include_router(progress.router)
@@ -83,7 +100,7 @@ def build_app(sessions: async_sessionmaker[AsyncSession] | None = None) -> FastA
             "status": "ok",
             "feature_version": FEATURE_VERSION,
             "classifier": type(classifier).__name__,
-            "stub": isinstance(classifier, StubClassifier),
+            "stub": stub,
         }
 
     return app
@@ -98,30 +115,18 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     to deal with a user id that may not exist yet.
     """
     if settings.dev_auth:
-        app.state.practice_deps = replace_tokens(
-            app.state.practice_deps, DevTokenVerifier(await _ensure_dev_user(app.state.sessions))
+        app.state.practice_deps = dataclasses.replace(
+            app.state.practice_deps,
+            tokens=DevTokenVerifier(await _ensure_dev_user(app.state.sessions)),
         )
     yield
-
-
-def replace_tokens(deps: practice.PracticeDeps, tokens: TokenVerifier) -> practice.PracticeDeps:
-    return practice.PracticeDeps(
-        classifier=deps.classifier,
-        templates=deps.templates,
-        letters=deps.letters,
-        tokens=tokens,
-        attempts=deps.attempts,
-        confidence_threshold=deps.confidence_threshold,
-        hold_frames=deps.hold_frames,
-        max_fps=deps.max_fps,
-    )
 
 
 async def _ensure_dev_user(sessions: async_sessionmaker[AsyncSession]) -> int:
     """The local account DEV_AUTH attributes everything to.
 
-    It exists so attempts and progress are exercised in development too; its
-    password hash is random, because nothing should ever sign in as it.
+    It exists so attempts and progress are exercised in development too. Its
+    password is random and discarded, because nothing should ever sign in as it.
     """
     async with sessions() as session:
         existing = (
@@ -131,7 +136,7 @@ async def _ensure_dev_user(sessions: async_sessionmaker[AsyncSession]) -> int:
             return int(existing.id)
 
         user = models.User(
-            email=DEV_EMAIL, password_hash=hash_password(f"unusable-{id(session)}-dev-account")
+            email=DEV_EMAIL, password_hash=BcryptHasher().hash(secrets.token_urlsafe(32))
         )
         session.add(user)
         await session.commit()
@@ -170,7 +175,10 @@ def _gesture_stack(
         len(classifier.classes),
         classifier.feature_version,
     )
-    return classifier, DbLetterCatalog(sessions), DbTemplateSource(sessions)
+    # The catalog offers only letters the model can predict: a target outside
+    # its classes could be started and never recognised.
+    catalog = DbLetterCatalog(sessions, classes=classifier.classes)
+    return classifier, catalog, DbTemplateSource(sessions)
 
 
 def _check_feature_version(classifier: GestureClassifier) -> None:

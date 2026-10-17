@@ -6,11 +6,13 @@ tests can substitute fakes without inheritance.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Protocol, runtime_checkable
 
-from app.domain.entities import Letter, Prediction
+from app.domain.entities import Account, AttemptRecord, Letter, LetterProgress, Prediction
 from app.domain.gesture.features import Features
 from app.domain.gesture.feedback import LetterTemplate
+from app.domain.progress import Standing
 
 
 @runtime_checkable
@@ -28,7 +30,8 @@ class GestureClassifier(Protocol):
 
     @property
     def classes(self) -> tuple[str, ...]:
-        """Every label the model can emit, including ``no_sign``."""
+        """Every label the model can emit. The letter catalog offers nothing
+        outside this set, so no target can be one the model never predicts."""
 
     def predict(self, features: Features) -> Prediction: ...
 
@@ -64,3 +67,54 @@ class TokenVerifier(Protocol):
 
         Returning the id rather than a yes/no is what lets attempts be
         attributed without the transport layer decoding tokens itself."""
+
+
+@runtime_checkable
+class TokenIssuer(Protocol):
+    """Mints access tokens for a signed-in user."""
+
+    def issue(self, user_id: int) -> str: ...
+
+
+class EmailTakenError(ValueError):
+    """Raised by UserRepository.create for an address already registered."""
+
+
+@runtime_checkable
+class UserRepository(Protocol):
+    async def create(self, email: str, password_hash: str) -> int:
+        """Store a new account and return its id.
+
+        Raises:
+            EmailTakenError: the address is already registered.
+        """
+
+    async def find_by_email(self, email: str) -> Account | None: ...
+
+
+@runtime_checkable
+class PasswordHasher(Protocol):
+    """Deliberately slow, so these are synchronous: callers run them off the
+    event loop rather than stall every open socket for each sign-in."""
+
+    def hash(self, password: str) -> str: ...
+
+    def verify(self, password: str, password_hash: str) -> bool: ...
+
+
+@runtime_checkable
+class AttemptRepository(Protocol):
+    async def record(
+        self,
+        attempt: AttemptRecord,
+        advance: Callable[[Standing | None], Standing],
+    ) -> None:
+        """Store the attempt and the standing ``advance`` derives from the
+        previous one, in one transaction, with that previous standing locked
+        so concurrent attempts cannot both read it (CLAUDE.md 9)."""
+
+
+@runtime_checkable
+class ProgressRepository(Protocol):
+    async def for_user(self, user_id: int) -> list[LetterProgress]:
+        """Every letter the user has attempted, most recently practised first."""

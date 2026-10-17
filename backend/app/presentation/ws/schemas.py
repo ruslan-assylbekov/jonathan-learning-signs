@@ -25,12 +25,14 @@ class Incoming(BaseModel):
 
 class AuthMessage(Incoming):
     type: Literal["auth"]
-    token: str
+    token: Annotated[str, Field(max_length=4096)]
 
 
 class StartMessage(Incoming):
     type: Literal["start"]
-    mode: str
+    # The modes CLAUDE.md 2 plans; attempts.mode is String(16), so a free-form
+    # value could fail the insert and silently lose the attempt.
+    mode: Literal["learn", "practice"]
     letter_id: int
     width: int = Field(gt=0)
     height: int = Field(gt=0)

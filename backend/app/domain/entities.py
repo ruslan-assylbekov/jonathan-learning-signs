@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from app.domain.gesture.feedback import Hint
+from app.domain.progress import Standing
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,3 +40,34 @@ class Evaluation:
     hold_progress: float
     succeeded: bool
     hints: list[Hint] = field(default_factory=list)
+
+
+@dataclass(frozen=True, slots=True)
+class Account:
+    """A stored user, as much of one as signing in needs."""
+
+    id: int
+    email: str
+    password_hash: str
+
+
+@dataclass(frozen=True, slots=True)
+class AttemptRecord:
+    """One finished or abandoned try at a letter (CLAUDE.md 9, ``attempts``)."""
+
+    user_id: int
+    letter_id: int
+    mode: str
+    success: bool
+    time_to_success_ms: float | None = None
+    avg_confidence: float | None = None
+    frames_count: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class LetterProgress:
+    """A learner's standing on one letter, with the letter it is about."""
+
+    letter_id: int
+    symbol: str
+    standing: Standing
