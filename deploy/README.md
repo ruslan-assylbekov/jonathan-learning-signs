@@ -17,7 +17,7 @@ Virtual machines → Create:
 | setting | value |
 |---|---|
 | Image | Ubuntu Server 24.04 LTS, x64 |
-| Size | `B2s` (2 vCPU, 4 GiB) — `B1s` with 1 GiB cannot hold the stack |
+| Size | `B2ats v2` (2 vCPU, 1 GiB, x64) — free for 12 months on Azure for Students |
 | Authentication | SSH public key, user `azureuser`; download the `.pem` |
 | Inbound ports | SSH (22), HTTP (80), HTTPS (443) |
 | Disk | Standard SSD, 30 GiB |
@@ -25,9 +25,29 @@ Virtual machines → Create:
 If you forgot a port: VM → Networking → *Add inbound port rule*. Azure's
 Ubuntu image has no firewall of its own, so the NSG is the only layer.
 
+### Which size
+
+Azure for Students gives $100 of credit for 12 months, no card, plus 750
+hours a month each of three small VM sizes free for those 12 months: `B1s`,
+`B2pts v2` (Arm) and `B2ats v2` (x64), all with 1 GiB of RAM. 750 hours is a
+whole month, so one of them can run around the clock at no cost.
+
+1 GiB is enough. Measured on the production stack with 10 concurrent practice
+sessions streaming real frames (`docker stats`, 2026-10-19): API 130 MiB,
+Postgres 58 MiB, nginx 24 MiB, certbot 7 MiB, Redis 5 MiB — about 225 MiB,
+leaving room for Ubuntu and Docker. Building the images on the VM is the
+tight part; `bootstrap.sh` adds 2 GB of swap for it. Not yet measured: the
+build's peak memory on a real 1 GiB VM.
+
+Prefer `B2ats v2`: two cores rather than `B1s`'s one, and x64, so nothing has
+to be built for Arm. Move to a larger size (VM → Size, a restart) only if the
+scaling experiment's extra API replicas or Prometheus/Grafana need it; that
+spends credit.
+
 **Stop the VM from the portal when you are not using it** so it shows as
 *Stopped (deallocated)*. Shutting it down from inside leaves it allocated and
-still billing against the student credit.
+still billing. For the free sizes this matters less, but a stopped VM also
+cannot be abused.
 
 ## 2. Point DuckDNS at it
 

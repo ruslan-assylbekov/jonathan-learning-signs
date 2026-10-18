@@ -497,10 +497,12 @@ Known pitfalls — check these first when something does not work:
    deallocated (stopped from the portal), and comes back different. DuckDNS is
    updated by a cron job on the VM, so the domain follows it; a Standard
    static IP avoids the issue at a small monthly cost.
-3. **Student credit is finite.** Azure for Students gives a fixed credit.
-   Deallocate the VM when it is not in use — a stopped-but-allocated VM still
-   bills compute. Size: 4 GiB RAM (e.g. B2s) fits the full stack; 1 GiB (B1s)
-   does not. Some subscriptions restrict regions or sizes by policy.
+3. **Student credit is finite.** Azure for Students: $100 for 12 months, plus
+   750 h/month free for 12 months of `B1s`, `B2pts v2` (Arm) and `B2ats v2`
+   (x64), all 1 GiB. Use `B2ats v2`: the stack measured ~225 MiB with 10
+   concurrent sessions (deploy/README.md). Deallocate when idle — a
+   stopped-but-allocated VM still bills. Some subscriptions restrict regions
+   or sizes by policy.
 4. **Camera requires HTTPS.** `getUserMedia` works only in a secure context
    (or localhost). Use a DuckDNS domain + certbot; auto-renew via cron/timer.
 5. **WebSocket through Nginx** needs `proxy_http_version 1.1`,
