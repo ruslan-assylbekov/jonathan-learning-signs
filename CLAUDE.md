@@ -56,7 +56,27 @@ Do not start a lower tier until the tier above works end-to-end.
 
 **Tier 3 — nice to have / future work**
 12. Spell-a-word mode.
-13. Motion-based letters.
+13. Motion-based letters (Д Ё З Й Ц Щ Ъ Ь), delivered as a **second tab**:
+    a test that mixes dynamic and static letters (requested 2026-10-19).
+    Plan, in order:
+    - Feasibility first, offline, no app changes: a script in
+      `experiments/models/` classifying the 8 dynamic letters from the
+      sequences already in the parquet (870 clips, 152 signers, ~7 frames
+      each), with the signer-independent split of 8.4. Its result decides
+      whether to build the rest; if it is poor, it goes into the report's
+      future work.
+    - Features: per-frame features drop global motion (step 5 moves the wrist
+      to the origin), and that motion is what separates these letters. Add a
+      sequence function to `features.py` (wrist trajectory + per-frame
+      handshape), never a copy elsewhere; it needs its own version constant.
+      Ask first (6.3).
+    - Possibly re-extract only the dynamic clips with denser frames.
+    - Server: the session keeps a sliding window of recent frames, so the
+      protocol may stay as it is; success means "the movement was performed"
+      instead of the hold rule. Hints for dynamic letters are limited to
+      right/wrong plus handshape.
+    - Risk: fast movement blurs frames and MediaPipe loses the hand, leaving
+      gaps in the window. Measure it, do not assume it.
 14. Client-side inference comparison (ONNX / TF.js).
 15. Run the Bukva pretrained video model on our static subset as a baseline.
 
