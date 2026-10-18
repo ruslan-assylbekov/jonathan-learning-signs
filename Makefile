@@ -59,5 +59,13 @@ eval:             ## evaluates the newest model, or v=N
 templates:        ## rebuild hint templates from the dataset and apply them
 	uv run --project backend --group ml python ml/build_templates.py --apply
 
-loadtest:
-	@echo "Not implemented yet: experiments/loadtest is planned (CLAUDE.md 16.3)." && exit 1
+# --- experiments (CLAUDE.md 16) ------------------------------------------------
+
+# The deployment under test, and names for the results files.
+LOADTEST_HOST ?= https://bukva-learning.duckdns.org
+LOADTEST_LABEL ?= azure
+LOADTEST_NETWORK ?= unnamed-network
+
+loadtest:         ## ramp simulated users against $(LOADTEST_HOST), then summarize
+	uv run --project backend --group ml python experiments/loadtest/run.py 		--target $(LOADTEST_HOST) --label $(LOADTEST_LABEL) --network $(LOADTEST_NETWORK) 		$(if $(LOADTEST_STATS),--stats-via "$(LOADTEST_STATS)")
+	uv run --project backend --group ml python experiments/loadtest/analyze.py

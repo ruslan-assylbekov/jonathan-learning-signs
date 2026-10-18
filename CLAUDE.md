@@ -81,7 +81,7 @@ reference.
 | Cloud | Microsoft Azure Ubuntu VM (Azure for Students subscription; switched from OCI 2026-10-17) |
 | CI/CD | GitHub Actions |
 | Monitoring | Prometheus, Grafana |
-| Load testing | Own asyncio generator on `websockets` (`experiments/loadtest/`). Was Locust; it has no WebSocket client, so it would have needed websocket-client on top, and an asyncio generator holds thousands of 15 Hz sockets from one process (decided 2026-10-19) |
+| Load testing | Own asyncio generator on `websockets` (`experiments/loadtest/`). Was Locust; it has no WebSocket client, so it would have needed websocket-client on top, while one asyncio process drives the sockets directly and measures its own send lag, so a client-bound result is flagged rather than reported as server capacity (decided 2026-10-19) |
 | Plots | matplotlib (ml dependency group only; never in the API image) |
 | Quality | ruff (lint + format), mypy, pytest, pytest-asyncio, httpx |
 
@@ -468,7 +468,7 @@ make extract      # ml/bukva/extract_landmarks.py → ml/data/bukva_landmarks.pa
 make train        # ml/train.py → the next unused ml/artifacts/model-vN.*; never overwrites
 make eval         # ml/evaluate.py on the newest model (or v=N)
 make templates    # ml/build_templates.py --apply: rebuild from the dataset and apply
-make loadtest     # experiments/loadtest against LOADTEST_HOST
+make loadtest     # experiments/loadtest against LOADTEST_HOST (default: the Azure deployment)
 ```
 
 `ml/collect.py` is run manually on Windows: `python ml/collect.py --participant P01`.

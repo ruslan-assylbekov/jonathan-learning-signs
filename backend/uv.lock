@@ -2084,6 +2084,7 @@ ml = [
     { name = "pandas" },
     { name = "pyarrow" },
     { name = "scikit-learn" },
+    { name = "websockets" },
 ]
 
 [package.metadata]
@@ -2119,6 +2120,7 @@ ml = [
     { name = "pandas", specifier = ">=2.2" },
     { name = "pyarrow", specifier = ">=17" },
     { name = "scikit-learn", specifier = ">=1.5" },
+    { name = "websockets", specifier = ">=15" },
 ]
 
 [[package]]
