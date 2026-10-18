@@ -36,6 +36,7 @@ ml = [
     "pyarrow>=17",
     "scikit-learn>=1.5",
     "joblib>=1.4",
+    "matplotlib>=3.9",
 ]
 
 [build-system]

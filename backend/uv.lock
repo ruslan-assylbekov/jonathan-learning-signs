@@ -2078,6 +2078,7 @@ dev = [
 ]
 ml = [
     { name = "joblib" },
+    { name = "matplotlib" },
     { name = "mediapipe" },
     { name = "opencv-python" },
     { name = "pandas" },
@@ -2112,6 +2113,7 @@ dev = [
 ]
 ml = [
     { name = "joblib", specifier = ">=1.4" },
+    { name = "matplotlib", specifier = ">=3.9" },
     { name = "mediapipe", specifier = ">=0.10" },
     { name = "opencv-python", specifier = ">=4.10" },
     { name = "pandas", specifier = ">=2.2" },

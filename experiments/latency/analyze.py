@@ -11,9 +11,39 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pandas as pd
+import matplotlib
+
+matplotlib.use("Agg")  # files only; no display needed
+import matplotlib.pyplot as plt  # noqa: E402
+import numpy as np  # noqa: E402
+import pandas as pd  # noqa: E402
+from matplotlib.ticker import FuncFormatter  # noqa: E402
 
 RESULTS = Path(__file__).with_name("results")
+
+
+def plot(data: pd.DataFrame) -> None:
+    """Cumulative distribution of round trips, one line per deployment and
+    network: the median and the tail are both readable off it."""
+    figure, axis = plt.subplots(figsize=(8, 4.5))
+    for (label, network), group in data.groupby(["label", "network"]):
+        rtt = np.sort(group["rtt_ms"].to_numpy())
+        share = np.arange(1, len(rtt) + 1) / len(rtt)
+        axis.plot(rtt, share, label=f"{label} ({network}), n={len(rtt)}")
+    axis.set_xscale("log")
+    # Plain milliseconds on the ticks rather than 2x10^0 notation.
+    plain = FuncFormatter(lambda value, _: f"{value:g}")
+    axis.xaxis.set_major_formatter(plain)
+    axis.xaxis.set_minor_formatter(plain)
+    axis.tick_params(axis="x", which="both", labelsize=8)
+    axis.set_xlabel("round trip per frame (ms, log scale)")
+    axis.set_ylabel("share of frames")
+    axis.set_title("WebSocket round trip, browser frame -> verdict")
+    axis.grid(True, which="both", alpha=0.3)
+    axis.legend(fontsize=8)
+    figure.tight_layout()
+    figure.savefig(RESULTS / "latency.png", dpi=150)
+    plt.close(figure)
 
 
 def main() -> None:
@@ -75,6 +105,9 @@ def main() -> None:
             f"| {group['rtt_ms'].median():.1f} | {group['rtt_ms'].quantile(0.95):.1f} |"
         )
 
+    plot(data)
+    marker = "Compare rows only within the same client network."
+    lines.insert(lines.index(marker), "![round trip](latency.png)\n")
     (RESULTS / "summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("\n".join(lines))
 

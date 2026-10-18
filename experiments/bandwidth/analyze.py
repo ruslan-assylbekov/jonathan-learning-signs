@@ -9,7 +9,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pandas as pd
+import matplotlib
+
+matplotlib.use("Agg")  # files only; no display needed
+import matplotlib.pyplot as plt  # noqa: E402
+import pandas as pd  # noqa: E402
 
 RESULTS = Path(__file__).with_name("results")
 SEND_HZ = 15
@@ -29,6 +33,38 @@ def kb(value: float) -> str:
 
 def mb(value: float) -> str:
     return f"{value / 1_000_000:,.2f}"
+
+
+def plot(marks: pd.DataFrame, jpeg: pd.DataFrame) -> None:
+    """Upload per minute at 15 Hz, log scale: the gap is orders of magnitude."""
+    bars = [
+        ("landmarks\n(4 decimals, sent)", float(marks["frame_wire"].mean())),
+        ("landmarks\n(full precision)", float(marks["frame_wire_full_precision"].mean())),
+    ]
+    for (long_side, quality), group in jpeg.groupby(["long_side", "quality"]):
+        mean_wire = ws_frame_bytes(float(group["jpeg_bytes"].mean()), masked=True)
+        bars.append((f"JPEG {long_side}px\nq{quality}", mean_wire))
+    labels = [label for label, _ in bars]
+    per_min_mb = [size * SEND_HZ * 60 / 1_000_000 for _, size in bars]
+    colors = ["#2a9d8f", "#8ab17d"] + ["#e76f51"] * (len(bars) - 2)
+
+    figure, axis = plt.subplots(figsize=(9, 4.5))
+    drawn = axis.bar(labels, per_min_mb, color=colors)
+    axis.set_yscale("log")
+    axis.set_ylabel("upload per minute at 15 Hz (MB, log scale)")
+    axis.set_title("Sending landmarks vs. sending JPEG frames")
+    for bar, value in zip(drawn, per_min_mb, strict=True):
+        axis.annotate(
+            f"{value:.2f}" if value < 10 else f"{value:.0f}",
+            (bar.get_x() + bar.get_width() / 2, value),
+            ha="center",
+            va="bottom",
+            fontsize=8,
+        )
+    axis.tick_params(axis="x", labelsize=8)
+    figure.tight_layout()
+    figure.savefig(RESULTS / "bandwidth.png", dpi=150)
+    plt.close(figure)
 
 
 def main() -> None:
@@ -55,9 +91,9 @@ def main() -> None:
         "|---|---|---|---|---|",
     ]
     for label, column in [
-        ("frame, payload (what ws-client.ts sends)", "frame_payload"),
+        ("frame, payload (what ws-client.ts sends: 4 decimals)", "frame_payload"),
         ("frame, on the wire", "frame_wire"),
-        ("frame, payload if rounded to 4 decimals *(not sent today)*", "frame_payload_rounded4"),
+        ("frame, payload at full precision *(before 2026-10-19)*", "frame_payload_full_precision"),
         ("eval reply, payload", "reply_payload"),
         ("eval reply, on the wire", "reply_wire"),
     ]:
@@ -150,6 +186,8 @@ def main() -> None:
         "```",
         "",
     ]
+    lines.insert(lines.index("## Per message"), "![upload per minute](bandwidth.png)\n")
+    plot(marks, jpeg)
     (RESULTS / "summary.md").write_text("\n".join(lines), encoding="utf-8")
     print("\n".join(lines[:60]))
 
