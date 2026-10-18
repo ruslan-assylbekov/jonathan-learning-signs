@@ -19,8 +19,9 @@ Course project for CSCI 436 Introduction to Cloud Computing. See
   [docs/alphabet.md](docs/alphabet.md).
 - **App:** sign-in, Learn mode with camera, skeleton overlay, hold meter and
   per-finger hints; attempts and progress are stored per account.
-- **Deployment:** a Docker Compose stack for an Azure VM, tested end to end
-  locally; see [deploy/README.md](deploy/README.md). Not yet running on Azure.
+- **Deployment:** live at <https://bukva-learning.duckdns.org> — Docker
+  Compose on an Azure `B2ats v2` VM (2 vCPU, 1 GiB, free tier), Let's Encrypt
+  TLS, updated with `deploy/scripts/deploy.sh`. See [deploy/README.md](deploy/README.md).
 - **Not yet measured:** accuracy on webcam recordings (domain shift), and the
   bandwidth, latency and load experiments (CLAUDE.md 16).
 

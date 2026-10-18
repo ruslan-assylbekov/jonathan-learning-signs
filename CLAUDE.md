@@ -615,6 +615,8 @@ Update checkboxes as work progresses.
       Learn mode end-to-end, browser-landmark validation of the model
       (done: all but browser-landmark validation, which needs webcam data)
 - [ ] **M5 — Deploy:** Azure + HTTPS + Nginx WS, CD pipeline, monitoring
+      (done: live at https://bukva-learning.duckdns.org on Azure B2ats v2 with
+      Let's Encrypt and nginx WebSocket proxying; open: CD pipeline, monitoring)
 - [ ] **M6 — Experiments:** bandwidth, latency, load test, scaling, models
 - [ ] **M7 — Delivery:** README with screenshots/GIF, report, demo video, slides
 

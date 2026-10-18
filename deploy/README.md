@@ -4,11 +4,13 @@ One Ubuntu VM running the whole stack with Docker Compose: nginx (TLS,
 static site, WebSocket proxy), the API, a one-shot migration job, Postgres,
 Redis, and certbot for renewals. See CLAUDE.md 14 for the pitfalls.
 
-Tested end to end on a local Docker with a self-signed certificate
-(`SELF_SIGNED=1`): HTTP redirects to HTTPS, migrations and hint templates
-apply, the API runs on the trained model, registration issues a JWT, the
-practice socket works over `wss://` through nginx, and the development token
-is refused. Not yet run on Azure itself.
+Running at <https://bukva-learning.duckdns.org> since 2026-10-18 on a
+`B2ats v2` VM (836 MiB usable RAM after Azure's reservation). Checked there:
+the images build with the 2 GB swap, HTTP redirects to HTTPS, the certificate
+is Let's Encrypt's, migrations and hint templates apply, the API runs on the
+trained model, registration issues a JWT, the practice socket works over
+`wss://`, the development token is refused, and `deploy.sh` updates the stack
+in place.
 
 ## 1. Create the VM (portal.azure.com)
 
