@@ -1,0 +1,5 @@
+decimals,frames,accuracy,macro_f1,predictions_changed_vs_full,frames_made_invalid
+full,3624,0.702,0.7061,0,0
+4,3624,0.7017,0.7059,6,0
+3,3624,0.7031,0.7069,120,0
+2,3624,0.6385,0.6309,923,163

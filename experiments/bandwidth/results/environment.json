@@ -1,0 +1,18 @@
+{
+  "python": "3.12.13",
+  "opencv": "5.0.0",
+  "numpy": "2.5.4",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "processor": "Intel64 Family 6 Model 170 Stepping 4, GenuineIntel",
+  "dataset_sha256": "1525b08c343a60f205b8631e78adf72fd2df258fb37e4b26d7906622c481eea7",
+  "bukva_dir": "D:\\Codes\\bukva",
+  "model": "model-v2.joblib",
+  "seeds": [
+    0,
+    1,
+    2
+  ],
+  "landmark_samples_per_seed": 1000,
+  "jpeg_videos_per_seed": 60,
+  "note": "offline measurement; no network involved"
+}
