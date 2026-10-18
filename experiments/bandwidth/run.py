@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import io
 import json
+import math
 import os
 import platform
 import sys
@@ -93,6 +94,15 @@ def frame_message(landmarks: list[list[float]], handedness: str, seq: int) -> st
     )
 
 
+def js_round4(value: float) -> float:
+    """What ws-client.ts does: Math.round(value * 1e4) / 1e4.
+
+    Math.round is floor(x + 0.5), which differs from Python's round() on exact
+    halves (banker's rounding) -- reproduced so the bytes match the browser.
+    """
+    return math.floor(value * 10_000 + 0.5) / 10_000
+
+
 def ws_frame_bytes(payload: int, *, masked: bool) -> int:
     """RFC 6455 framing: 2-byte header, extended length, 4-byte client mask."""
     header = 2 + (0 if payload < 126 else 2 if payload < 65536 else 8)
@@ -110,7 +120,7 @@ def measure_landmarks(frame: pd.DataFrame, seed: int) -> pd.DataFrame:
         width, height = int(record["width"]), int(record["height"])
         landmarks = [[float(record[f"{axis}{i}"]) for axis in "xyz"] for i in range(21)]
         message = frame_message(landmarks, hand, seq)
-        rounded = frame_message([[round(c, 4) for c in point] for point in landmarks], hand, seq)
+        rounded = frame_message([[js_round4(c) for c in point] for point in landmarks], hand, seq)
 
         # The learner is attempting the letter they are showing, as in Learn
         # mode; a fresh session per frame keeps hold state out of it.
@@ -123,7 +133,8 @@ def measure_landmarks(frame: pd.DataFrame, seed: int) -> pd.DataFrame:
             confidence_threshold=0.7,
             hold_frames=10,
         )
-        evaluation = session.evaluate(landmarks, Handedness(hand), mirrored=False)
+        sent = [[js_round4(c) for c in point] for point in landmarks]
+        evaluation = session.evaluate(sent, Handedness(hand), mirrored=False)
         reply = EvalOut.of(
             evaluation, seq=seq, t_client=T_CLIENT, server_ms=0.512
         ).model_dump_json()
@@ -132,9 +143,14 @@ def measure_landmarks(frame: pd.DataFrame, seed: int) -> pd.DataFrame:
             {
                 "seed": seed,
                 "letter": letter,
-                "frame_payload": len(message.encode("utf-8")),
-                "frame_wire": ws_frame_bytes(len(message.encode("utf-8")), masked=True),
-                "frame_payload_rounded4": len(rounded.encode("utf-8")),
+                # What ws-client.ts sends since 2026-10-19 (rounded), and what
+                # it sent before (full precision) for comparison.
+                "frame_payload": len(rounded.encode("utf-8")),
+                "frame_wire": ws_frame_bytes(len(rounded.encode("utf-8")), masked=True),
+                "frame_payload_full_precision": len(message.encode("utf-8")),
+                "frame_wire_full_precision": ws_frame_bytes(
+                    len(message.encode("utf-8")), masked=True
+                ),
                 "reply_payload": len(reply.encode("utf-8")),
                 "reply_wire": ws_frame_bytes(len(reply.encode("utf-8")), masked=False),
                 "reply_hints": len(evaluation.hints),

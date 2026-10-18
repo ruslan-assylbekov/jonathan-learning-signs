@@ -81,7 +81,8 @@ reference.
 | Cloud | Microsoft Azure Ubuntu VM (Azure for Students subscription; switched from OCI 2026-10-17) |
 | CI/CD | GitHub Actions |
 | Monitoring | Prometheus, Grafana |
-| Load testing | Locust (WebSocket users) |
+| Load testing | Own asyncio generator on `websockets` (`experiments/loadtest/`). Was Locust; it has no WebSocket client, so it would have needed websocket-client on top, and an asyncio generator holds thousands of 15 Hz sockets from one process (decided 2026-10-19) |
+| Plots | matplotlib (ml dependency group only; never in the API image) |
 | Quality | ruff (lint + format), mypy, pytest, pytest-asyncio, httpx |
 
 Package management: `uv`. Do not add libraries outside this table without
@@ -270,8 +271,8 @@ in the same commit, plus integration tests.
 {"type": "auth", "token": "<JWT>"}
 {"type": "start", "mode": "learn", "letter_id": 5, "width": 1280, "height": 720}
 {"type": "frame", "seq": 123, "t_client": 1712345678123,
- "handedness": "Right", "mirrored": true,
- "landmarks": [[0.51, 0.62, -0.03], "... 21 items total"]}
+ "handedness": "Right", "mirrored": false,
+ "landmarks": [[0.5123, 0.6201, -0.0307], "... 21 items total"]}
 {"type": "stop"}
 ```
 
@@ -300,6 +301,11 @@ Rules:
   `ml/bukva/extract_landmarks.py` must apply the same rule to dataset videos:
   getting this wrong trains the model in a mirrored feature space and shows up
   only as unexplained inaccuracy.
+- The client rounds every coordinate to **4 decimals** before sending
+  (1/10,000 of the frame, 0.13 px at 1280 — below MediaPipe's jitter). It cuts
+  a frame message from 1,395 to 592 bytes; on the held-out test signers
+  accuracy moved 0.7020 → 0.7017 with no frame made invalid. 2 decimals is too
+  coarse: joints collapse and frames become invalid (`experiments/bandwidth`).
 - `seq` and `t_client` are echoed so the client can compute round-trip latency.
   `t_client` is opaque to the server; the browser client sends milliseconds
   since the epoch (`Date.now()`). `mode` is `learn` or `practice`.
@@ -462,7 +468,7 @@ make extract      # ml/bukva/extract_landmarks.py → ml/data/bukva_landmarks.pa
 make train        # ml/train.py → the next unused ml/artifacts/model-vN.*; never overwrites
 make eval         # ml/evaluate.py on the newest model (or v=N)
 make templates    # ml/build_templates.py --apply: rebuild from the dataset and apply
-make loadtest     # planned (CLAUDE.md 16.3); currently exits with a notice
+make loadtest     # experiments/loadtest against LOADTEST_HOST
 ```
 
 `ml/collect.py` is run manually on Windows: `python ml/collect.py --participant P01`.
@@ -545,7 +551,7 @@ info (VM shape, CPU, RAM, OS, Docker version) next to the results.
    (encode at several qualities/resolutions) — not by sending images to the app.
 2. **Latency:** end-to-end round trip (p50/p95/p99) using `seq`/`t_client`;
    local Docker vs Azure deployment; split into network vs `server_ms`.
-3. **Load test:** Locust users streaming frames at 15 Hz over WebSocket;
+3. **Load test:** simulated users streaming frames at 15 Hz over WebSocket;
    increase users until p95 latency or error rate breaks a threshold.
 4. **Horizontal scaling:** 1 / 2 / 4 API replicas behind Nginx; max
    sustainable users per configuration.

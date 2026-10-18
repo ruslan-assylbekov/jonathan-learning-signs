@@ -18,7 +18,10 @@ recognition, while also keeping video on the user's device.
   sends them (`JSON.stringify`, same key order), from 1,000 real frames per
   seed in `ml/data/bukva_landmarks.parquet`. Numbers use ECMAScript's
   Number-to-string layout; `run.py`'s `js_number` was checked against Node's
-  `String(x)` on 15,616 values with no mismatch.
+  `String(x)` on 15,616 values with no mismatch. Since 2026-10-19 the client
+  rounds coordinates to 4 decimals (`Math.round(x * 1e4) / 1e4`); `js_round4`
+  reproduces it and matched Node on 23,905 values. Full-precision sizes are
+  kept in a separate column for comparison.
 - **Server replies** come from the real pipeline: model-v2, the shipped hint
   templates and the production `EvalOut` serializer, with the learner
   attempting the letter they are showing.
@@ -32,7 +35,9 @@ recognition, while also keeping video on the user's device.
 - **Wire size** adds RFC 6455 WebSocket framing (client frames are masked).
   TLS record overhead is not included.
 - **Precision check** (`precision.py`): accuracy of model-v2 on the held-out
-  test signers when landmarks are rounded before sending.
+  test signers when landmarks are rounded before sending. This is what chose
+  4 decimals: the accuracy change is in the fourth digit, while 2 decimals
+  makes frames invalid.
 
 ## How to run
 
@@ -46,7 +51,7 @@ uv run --project backend --group ml python experiments/bandwidth/analyze.py
 
 Generated, never hand-edited: [`results/summary.md`](results/summary.md), from
 `results/landmarks.csv`, `results/jpeg.csv`, `results/precision.csv` and
-`results/environment.json`.
+`results/environment.json`, with the plot `results/bandwidth.png`.
 
 ## Limitations
 
@@ -57,4 +62,3 @@ Generated, never hand-edited: [`results/summary.md`](results/summary.md), from
 - The JPEG comparison is upload only, at the same 15 Hz the client uses, and
   at 30 fps for streaming every frame. A server-side design would also need
   replies, which are small in both designs.
-- No plots yet: matplotlib is not in CLAUDE.md 3's dependency table.

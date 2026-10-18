@@ -63,6 +63,20 @@ export interface PracticeHandlers {
 const SEND_HZ = 15;
 const MIN_SEND_INTERVAL_MS = 1000 / SEND_HZ;
 
+/**
+ * Coordinates are rounded to 4 decimals before sending: 1/10,000 of the frame,
+ * 0.13 px at 1280, far below MediaPipe's own jitter. It cuts a frame message
+ * from 1,395 to 592 bytes; on the held-out test signers accuracy moved from
+ * 0.7020 to 0.7017 with no frame made invalid. 2 decimals is too coarse --
+ * joints collapse onto each other. See experiments/bandwidth.
+ */
+const COORDINATE_DECIMALS = 4;
+const SCALE = 10 ** COORDINATE_DECIMALS;
+
+function round(value: number): number {
+  return Math.round(value * SCALE) / SCALE;
+}
+
 export class PracticeSocket {
   private socket: WebSocket;
   private seq = 0;
@@ -131,7 +145,7 @@ export class PracticeSocket {
       t_client: now,
       handedness: hand.handedness,
       mirrored: false, // the pixels are unflipped; see landmarker.ts
-      landmarks: hand.landmarks,
+      landmarks: hand.landmarks.map(([x, y, z]) => [round(x), round(y), round(z)]),
     });
     return true;
   }

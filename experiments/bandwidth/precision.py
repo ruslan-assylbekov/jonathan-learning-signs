@@ -51,7 +51,10 @@ def main() -> None:
     rows = []
 
     for decimals in DECIMALS:
-        points = coords if decimals is None else np.round(coords, decimals)
+        # Math.round semantics (floor(x + 0.5)), as the browser rounds.
+        points = (
+            coords if decimals is None else np.floor(coords * 10**decimals + 0.5) / 10**decimals
+        )
         features = np.zeros((len(test), FEATURE_LENGTH))
         valid = np.ones(len(test), dtype=bool)
         for i, (landmarks, hand, width, height) in enumerate(
