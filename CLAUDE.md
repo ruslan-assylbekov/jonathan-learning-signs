@@ -644,6 +644,8 @@ Update checkboxes as work progresses.
       (done: live at https://bukva-learning.duckdns.org on Azure B2ats v2 with
       Let's Encrypt and nginx WebSocket proxying; open: CD pipeline, monitoring)
 - [ ] **M6 — Experiments:** bandwidth, latency, load test, scaling, models
+      (done: bandwidth; latency and load test, local and Azure; models via
+      ml/evaluate.py; open: scaling, own-webcam accuracy)
 - [ ] **M7 — Delivery:** README with screenshots/GIF, report, demo video, slides
 
 ---
