@@ -8,6 +8,7 @@ Compare rows only within the same client network.
 
 | deployment | client network | frames | RTT p50 | RTT p95 | RTT p99 | server p50 | server p95 | outside p50 | outside p95 |
 |---|---|---|---|---|---|---|---|---|---|
+| azure | dorm-wifi | 2700 | 61.1 | 160.7 | 170.1 | 0.78 | 0.99 | 60.3 | 159.8 |
 | local-docker | loopback | 2700 | 5.6 | 6.7 | 8.1 | 1.84 | 2.29 | 3.7 | 4.6 |
 
 All times in milliseconds.
@@ -18,6 +19,9 @@ Run-to-run agreement shows whether a single minute is representative.
 
 | deployment | client network | session | run | frames | RTT p50 | RTT p95 |
 |---|---|---|---|---|---|---|
+| azure | dorm-wifi | 20261019T110330Z | 0 | 900 | 62.3 | 162.8 |
+| azure | dorm-wifi | 20261019T110330Z | 1 | 900 | 60.0 | 158.5 |
+| azure | dorm-wifi | 20261019T110330Z | 2 | 900 | 59.5 | 158.5 |
 | local-docker | loopback | 20261018T215714Z | 0 | 900 | 5.4 | 6.6 |
 | local-docker | loopback | 20261018T215714Z | 1 | 900 | 5.6 | 6.6 |
 | local-docker | loopback | 20261018T215714Z | 2 | 900 | 5.6 | 6.7 |

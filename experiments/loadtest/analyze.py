@@ -64,14 +64,16 @@ def capacity(run: pd.DataFrame) -> tuple[int | None, str]:
 
 def plot(data: pd.DataFrame, max_p95_ms: float | None) -> None:
     figure, (latency, throughput) = plt.subplots(1, 2, figsize=(11, 4.5))
-    for (label, network), group in data.groupby(["label", "network"]):
+    palette = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    groups = data.groupby(["label", "network"])
+    # One colour per deployment; its repeats share it, so the lines group.
+    for color, ((label, network), group) in zip(palette, groups, strict=False):
         for i, (_, run) in enumerate(group.groupby(["session", "repeat"])):
             run = run.sort_values("users")
             name = f"{label} ({network})" if i == 0 else None
-            color = latency.plot(run["users"], run["rtt_p95_ms"], "o-", alpha=0.7, label=name)[
-                0
-            ].get_color()
-            throughput.plot(run["users"], run["achieved_hz"], "o-", color=color, alpha=0.7)
+            style = {"color": color, "alpha": 0.6, "marker": "o", "markersize": 4}
+            latency.plot(run["users"], run["rtt_p95_ms"], label=name, **style)
+            throughput.plot(run["users"], run["achieved_hz"], **style)
     if max_p95_ms is not None:
         latency.axhline(
             max_p95_ms, color="grey", linestyle="--", linewidth=1, label="p95 threshold"
@@ -91,7 +93,7 @@ def plot(data: pd.DataFrame, max_p95_ms: float | None) -> None:
     latency.tick_params(axis="y", which="both", labelsize=8)
     latency.set_xlabel("concurrent users")
     latency.set_ylabel("round trip p95 (ms, log scale)")
-    latency.set_title("Latency under load (one line per repeat)")
+    latency.set_title("Latency under load (one line per repeat, 3 repeats)")
     latency.legend(fontsize=8)
     throughput.set_xlabel("concurrent users")
     throughput.set_ylabel("frames answered per second")

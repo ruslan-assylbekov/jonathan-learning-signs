@@ -1,0 +1,17 @@
+{
+  "label": "azure",
+  "network": "dorm-wifi",
+  "target": "https://bukva-learning.duckdns.org",
+  "health": {
+    "status": "ok",
+    "feature_version": 2,
+    "classifier": "JoblibClassifier",
+    "stub": false
+  },
+  "client_platform": "Windows-11-10.0.26200-SP0",
+  "client_python": "3.12.13",
+  "send_hz": 15,
+  "seconds_per_run": 60,
+  "runs": 3,
+  "started_at": "20261019T110330Z"
+}
