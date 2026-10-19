@@ -43,6 +43,10 @@ uv run --project backend --group ml python experiments/latency/run.py \
 uv run --project backend --group ml python experiments/latency/analyze.py
 ```
 
+After an Azure run, record the server next to the results (VM size, region,
+CPU, memory, OS, Docker, deployed commit):
+`uv run --project backend --group ml python experiments/vm_info.py --via "ssh -i KEY azureuser@HOST" --out experiments/latency/results/<run prefix>__vm.json`
+
 The test account (`latency@tests.example.com` by default) stays on the target.
 Remove it from the deployment with:
 `docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env exec -T postgres psql -U sign -d sign -c "DELETE FROM users WHERE email LIKE '%@tests.example.com'"`
@@ -52,7 +56,7 @@ Remove it from the deployment with:
 Generated, never hand-edited: [`results/summary.md`](results/summary.md).
 
 - Local Docker (Windows 11 laptop, Docker Desktop, loopback): measured.
-- TODO: run experiment 16.2 against Azure from a stable network.
+- Azure (B2ats v2), from a student-dorm Wi-Fi network: measured 2026-10-19.
 
 ## Limitations
 
@@ -60,5 +64,8 @@ Generated, never hand-edited: [`results/summary.md`](results/summary.md).
   to "outside"; a native Linux host would be faster.
 - `server_ms` excludes JSON parsing and validation of the message in the
   WebSocket handler; those land in "outside".
+- One client network per deployment so far. Wi-Fi adds its own tail (p95
+  well above p50 on Azure); a wired client would separate the Wi-Fi share
+  from the internet path.
 - The browser's own time -- MediaPipe detection before sending -- is not part
   of the round trip measured here.

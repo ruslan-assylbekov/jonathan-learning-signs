@@ -80,6 +80,10 @@ event loop already failed at 20 users (p95 above 250 ms), where the same code
 in a Linux container answers within 18 ms at p95. That says nothing about the
 deployment; it was a smoke test, not a result, and it is not in `results/`.
 
+After an Azure run, record the server next to the results (VM size, region,
+CPU, memory, OS, Docker, deployed commit):
+`uv run --project backend --group ml python experiments/vm_info.py --via "ssh -i KEY azureuser@HOST" --out experiments/loadtest/results/<run prefix>__vm.json`
+
 The test accounts (`loadtest-NNNN@tests.example.com`) stay on the target.
 Remove them with:
 `docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env exec -T postgres psql -U sign -d sign -c "DELETE FROM users WHERE email LIKE '%@tests.example.com'"`
@@ -90,7 +94,8 @@ Generated, never hand-edited: [`results/summary.md`](results/summary.md), with
 the plot `results/loadtest.png`.
 
 - Local baseline (API container on the laptop, loopback): measured.
-- TODO: run experiment 16.3 against Azure from a stable network.
+- Azure (B2ats v2, Poland Central), from a student-dorm Wi-Fi network, with
+  the API container's CPU sampled over SSH: measured 2026-10-19.
 
 ## Limitations
 
